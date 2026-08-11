@@ -89,6 +89,12 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 .scroll{max-height:65vh;overflow:auto;border-radius:10px;border:1px solid var(--line)}
 .muted{color:var(--muted)}
 .trunc{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:400}
+#relmodal[hidden]{display:none}
+#relmodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:60;overflow:auto}
+#relOpcoes{display:flex;flex-direction:column;gap:7px}
+#relmodal label{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+#relmodal input[type=checkbox]{width:16px;height:16px;accent-color:var(--btn);cursor:pointer}
+#relprint{display:none}
 #modal[hidden]{display:none}
 #modal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:50;overflow:auto}
 .mbox{background:var(--bg);border:1px solid var(--line);border-radius:14px;width:min(1100px,100%);box-shadow:var(--shadow)}
@@ -113,6 +119,35 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 .ftotal b{font-size:24px;color:var(--accent)}
 .pg{display:flex;gap:8px;align-items:center;margin-top:10px;justify-content:flex-end;color:var(--muted)}
 @media print{
+  body.imprimindo>*{display:none!important}
+  body.imprimindo #relprint{display:block!important;padding:0}
+  #relprint table{width:100%;border-collapse:collapse;font-size:10.5px}
+  #relprint th,#relprint td{border:1px solid #bbb;padding:3px 5px;color:#000;background:#fff}
+  #relprint h1{font-size:15px;margin:0 0 2px}
+  #relprint h2{font-size:12px;margin:14px 0 4px;padding:4px 6px}
+  #relprint .sub{color:#444;font-size:10px}
+  #relprint tfoot th{background:#eee!important;font-weight:700}
+  #relprint .rhead h1{font-size:16px;margin:0 0 3px;font-weight:800}
+  #relprint .rhead .sub{color:#555;font-size:10px}
+  #relprint .robra{border-left:4px solid #0284c7;padding:2px 0 2px 10px;margin:14px 0 6px;break-inside:avoid}
+  #relprint .rnum{font-size:14px;font-weight:800}
+  #relprint .rdesc{color:#555;font-size:10.5px}
+  #relprint .rtags{margin-top:3px;display:flex;gap:5px;flex-wrap:wrap}
+  #relprint .rtag{border:1px solid;border-radius:99px;padding:1px 7px;font-size:9px;font-weight:700}
+  #relprint .rsec{border:1px solid;border-radius:7px;overflow:hidden;margin-top:8px;break-inside:avoid}
+  #relprint .rsectit{display:flex;align-items:center;gap:10px;padding:5px 9px;font-weight:800;font-size:11.5px}
+  #relprint .rsectit .rcont{font-weight:600;font-size:9.5px;opacity:.85}
+  #relprint .rsectit .rtot{margin-left:auto;font-size:13px}
+  #relprint .rsec table{border:0}
+  #relprint .rsec th,#relprint .rsec td{border:0;border-bottom:1px solid #e2e8f0}
+  #relprint .rsec thead th{background:#f1f5f9!important;color:#475569;font-size:9.5px}
+  #relprint td.r,#relprint th.r{text-align:right}
+  #relprint td.opi{color:#16a34a;font-weight:700;white-space:nowrap}
+  #relprint td.opr{color:#dc2626;font-weight:700;white-space:nowrap}
+  #relprint .rtotal{display:flex;justify-content:space-between;align-items:center;border:2px solid #0284c7;
+    border-radius:8px;padding:6px 10px;margin-top:8px;font-weight:700;font-size:12px;break-inside:avoid}
+  #relprint .rtotal b{color:#0284c7;font-size:15px}
+
   body{background:#fff;color:#000}
   header,.wrap{display:none}
   #modal{position:static;background:#fff;padding:0;display:block}
@@ -176,6 +211,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
     <button id="csv">Exportar CSV</button>
     <button id="xlsx">⬇️ Baixar Excel filtrado</button>
     <button class="sec" id="btnInat" hidden></button>
+    <button id="btnRel" hidden>📄 Gerar relatório</button>
   </div>
 
   <div class="tabs">
@@ -193,11 +229,41 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
   </div>
 </div>
 
+<div id="relmodal" hidden>
+  <div class="mbox" style="max-width:620px">
+    <div class="mtop"><strong>Gerar relatório do confronto</strong><span style="flex:1"></span>
+      <button class="sec" id="relFechar">Fechar ✕</button></div>
+    <div style="padding:16px">
+      <p id="relEscopo" style="margin-top:0;font-size:13px"></p>
+      <p class="muted" style="margin-top:0;font-size:12.5px">Marque o que deve aparecer no relatório. Ele respeita os filtros atuais e ignora os serviços que estão fora da análise.</p>
+      <div id="relOpcoes">
+        <label><input type="checkbox" value="Pendente de pagamento" checked> 🔴 Pendente de pagamento</label>
+        <label><input type="checkbox" value="Pendente parcial" checked> 🟠 Pendente parcial</label>
+        <label><input type="checkbox" value="Pago a mais"> 🟣 Pago a mais</label>
+        <label><input type="checkbox" value="Pago sem apontamento"> 🔵 Pago sem apontamento</label>
+        <label><input type="checkbox" value="Obra não encontrada no termômetro"> ⚠️ Obras não encontradas no termômetro</label>
+        <label><input type="checkbox" value="Conferido"> ✅ Conferido (apontado = pago)</label>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+      <label><input type="checkbox" id="relDetalhe" checked> Detalhar serviço a serviço (desmarcado = só totais por obra)</label>
+      <p id="relResumo" class="muted" style="font-size:12.5px;margin:12px 0 0"></p>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button id="relPng">🖼️ Baixar PNG</button>
+        <button id="relPdf">📄 Baixar PDF</button>
+      </div>
+      <p class="muted" style="font-size:11.5px;margin-bottom:0">No PDF, escolha “Salvar como PDF” na janela de impressão que o navegador abrir.</p>
+    </div>
+  </div>
+</div>
+
+<div id="relprint" hidden></div>
+
 <div id="modal" hidden>
   <div class="mbox">
     <div class="mtop">
       <strong id="tituloFicha">Ficha da obra</strong>
       <span style="flex:1"></span>
+      <button class="sec" id="relobra" hidden>📄 Relatório desta obra</button>
       <button class="sec" id="csvobra">CSV desta obra</button>
       <button class="sec" id="imprimir">Imprimir</button>
       <button class="sec" id="fechar">Fechar ✕</button>
@@ -496,6 +562,7 @@ function abrirFicha(num,tipo){
   fichaSort = fichaTipo==="conf" ? {k:"serv",d:1} : {k:"cd_mao_de_obra_descricao",d:1};
   document.getElementById("tituloFicha").textContent = fichaTipo==="conf" ? "Confronto da obra" : "Ficha da obra";
   document.getElementById("csvobra").textContent = fichaTipo==="conf" ? "CSV do confronto" : "CSV desta obra";
+  document.getElementById("relobra").hidden = fichaTipo!=="conf";
   (fichaTipo==="conf"?desenharFichaConfronto:desenharFicha)();
   document.getElementById("modal").hidden=false; document.body.style.overflow="hidden";
 }
@@ -546,6 +613,7 @@ document.getElementById("fechar").onclick=fecharFicha;
 document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")fecharFicha()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&fichaObra)fecharFicha()});
 document.getElementById("imprimir").onclick=()=>window.print();
+document.getElementById("relobra").onclick=()=>abrirRelatorio(fichaObra);
 document.getElementById("csvobra").onclick=()=>{
   if(fichaTipo==="conf"){
     const g=confrontoPorObra().find(x=>x.obra===fichaObra); if(!g)return;
@@ -572,6 +640,7 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   document.getElementById("fsitconf").hidden=!conf;
   ["fsit","fmo","fcon"].forEach(id=>document.getElementById(id).hidden=conf);
   document.getElementById("xlsx").hidden=conf;
+  document.getElementById("btnRel").hidden=!conf;
   const av=document.getElementById("avisoConf"); av.hidden=!conf;
   atualizarBotaoInativos(conf);
   if(conf) av.innerHTML="⚖️ <b>Apontado</b> = termômetro de serviços (planilha simplificada por obra, lida em 11/08/2026) · <b>Pago</b> = esta medição. "+
@@ -717,6 +786,267 @@ function carregarOriginal(){
     {datas:PLANILHA.datas, aba:PLANILHA.aba, original:true});
 }
 document.getElementById("btnOrig").onclick=carregarOriginal;
+
+/* ---------- relatório do confronto (PDF e PNG) — mesmo padrão visual da ficha ---------- */
+const SIT_ORDEM=["Pendente de pagamento","Pendente parcial","Pago a mais","Pago sem apontamento","Obra não encontrada no termômetro","Conferido"];
+const SIT_TEMA={
+  "Pendente de pagamento":   {ico:"🔴",bg:"#fee2e2",txt:"#b91c1c",bar:"#dc2626"},
+  "Pendente parcial":        {ico:"🟠",bg:"#ffedd5",txt:"#b45309",bar:"#d97706"},
+  "Pago a mais":             {ico:"🟣",bg:"#f3e8ff",txt:"#7e22ce",bar:"#a855f7"},
+  "Pago sem apontamento":    {ico:"🔵",bg:"#e0f2fe",txt:"#0369a1",bar:"#0284c7"},
+  "Obra não encontrada no termômetro":{ico:"⚠️",bg:"#eef2f7",txt:"#475569",bar:"#64748b"},
+  "Conferido":               {ico:"✅",bg:"#dcfce7",txt:"#15803d",bar:"#16a34a"}
+};
+const relSelecionadas=()=>[...document.querySelectorAll("#relOpcoes input:checked")].map(i=>i.value)
+  .sort((a,b)=>SIT_ORDEM.indexOf(a)-SIT_ORDEM.indexOf(b));
+
+let relObra=null;   /* quando preenchido, o relatório cobre só esta obra */
+
+/* respeita os filtros da aba e ignora os serviços desativados */
+function relDados(){
+  const sits=relSelecionadas(), det=document.getElementById("relDetalhe").checked;
+  const q=document.getElementById("q").value.trim().toLowerCase();
+  const mun=document.getElementById("fmun").value, fs=document.getElementById("fsitconf").value;
+  const obras=confrontoPorObra().filter(g=> relObra ? g.obra===relObra :
+    (!mun||g.mun===mun)&&(!q||(g.obra+" "+g.mun).toLowerCase().includes(q))&&
+    (!fs || (fs==="pend"? g.pend>0 : fs==="maior"? g.maior>0 : fs==="sem"? g.sem>0 :
+             fs==="nao"? g.naoenc : fs==="ok"? (g.div===0&&!g.naoenc) : true)));
+  const out=[];
+  for(const g of obras){
+    const itens=g.itens.filter(x=>!x.inativo&&sits.includes(x.sit));
+    if(!itens.length) continue;
+    const secoes=sits.map(sit=>{
+      const its=itens.filter(x=>x.sit===sit).sort((a,b)=>
+        a.op!==b.op ? (a.op==="I"?-1:1) : String(a.serv).localeCompare(String(b.serv),"pt-BR"));
+      return {sit,itens:its,total:its.reduce((a,x)=>a+Math.abs(x.vdif),0),
+              inst:its.filter(x=>x.op==="I").length, retir:its.filter(x=>x.op==="R").length};
+    }).filter(s=>s.itens.length);
+    out.push({obra:g.obra,mun:g.mun,desc:(META[g.obra]||{}).desc||"",secoes,itens,
+      pend:g.pend, naoenc:g.naoenc, inat:g.inat||0,
+      total:itens.reduce((a,x)=>a+Math.abs(x.vdif),0)});
+  }
+  out.sort((a,b)=>b.total-a.total);
+  return {obras:out,sits,det,
+    total:out.reduce((a,o)=>a+o.total,0),
+    itens:out.reduce((a,o)=>a+o.itens.length,0),
+    porSit:sits.map(s=>({sit:s,
+      n:out.reduce((a,o)=>a+o.itens.filter(x=>x.sit===s).length,0),
+      v:out.reduce((a,o)=>a+o.itens.filter(x=>x.sit===s).reduce((b,x)=>b+Math.abs(x.vdif),0),0)}))
+      .filter(x=>x.n)};
+}
+function relResumo(){
+  const d=relDados(), el=document.getElementById("relResumo");
+  if(!d.sits.length){el.innerHTML="Selecione ao menos uma situação.";return}
+  const inat=INATIVOS.size?` · ${INATIVOS.size} serviço(s) desativado(s) ficam de fora`:"";
+  el.innerHTML=`Vai gerar <b>${nnum(d.obras.length)} obras</b> e <b>${nnum(d.itens)} serviços</b>, somando <b>${brl(d.total)}</b>${inat}.`;
+}
+function relCabecalho(){
+  const f=[], mun=document.getElementById("fmun").value, q=document.getElementById("q").value.trim();
+  if(mun) f.push("Município: "+mun);
+  if(q) f.push('Busca: "'+q+'"');
+  if(INATIVOS.size) f.push(INATIVOS.size+" serviço(s) fora da análise");
+  return {titulo: relObra ? "Confronto da obra "+relObra : "Confronto apontado × pago — novo contrato",
+    sub:"Apontado: termômetro de serviços · Pago: medição 11.08 · Gerado em "+new Date().toLocaleString("pt-BR"),
+    filtros:f.join(" · ")};
+}
+
+/* ---------- PDF: HTML com o mesmo desenho da ficha ---------- */
+function relHTML(){
+  const d=relDados(), c=relCabecalho();
+  const secao=(s)=>{
+    const t=SIT_TEMA[s.sit];
+    return `<div class="rsec" style="border-color:${t.bar}">
+      <div class="rsectit" style="background:${t.bg};color:${t.txt};border-bottom:2px solid ${t.bar}">
+        <span>${t.ico} ${s.sit}</span>
+        <span class="rcont">${s.itens.length} serviços · ${s.inst} inst. / ${s.retir} retir.</span>
+        <span class="rtot">${brl(s.total)}</span></div>
+      <table><thead><tr><th>Código</th><th>Op.</th><th>Serviço</th>
+        <th class="r">Apontado</th><th class="r">Pago</th><th class="r">Diferença</th><th class="r">Valor</th></tr></thead>
+      <tbody>${s.itens.map(x=>`<tr><td>${x.cod}</td>
+        <td class="${x.op==="I"?"opi":"opr"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td>
+        <td>${esc(x.serv)}</td><td class="r">${nnum(x.qa)}</td><td class="r">${nnum(x.qp)}</td>
+        <td class="r">${nnum(x.dif)}</td><td class="r"><b>${brl(Math.abs(x.vdif))}</b></td></tr>`).join("")}</tbody>
+      <tfoot><tr style="background:${t.bg};color:${t.txt}"><th colspan="6">${s.sit} — total</th>
+        <th class="r">${brl(s.total)}</th></tr></tfoot></table></div>`;
+  };
+  const obra=(o)=>`<div class="robra">
+      <div class="rnum">Obra ${o.obra}</div>
+      <div class="rdesc">${esc(o.desc)}${o.mun?" · "+esc(o.mun):""}</div>
+      <div class="rtags"><span class="rtag" style="background:#f3e8ff;color:#7e22ce;border-color:#a855f7">Novo contrato</span>
+        ${o.naoenc?'<span class="rtag" style="background:#eef2f7;color:#475569;border-color:#64748b">Não encontrada no termômetro</span>':
+          o.pend>0?'<span class="rtag" style="background:#fee2e2;color:#b91c1c;border-color:#dc2626">Pendente de pagamento</span>':
+          '<span class="rtag" style="background:#dcfce7;color:#15803d;border-color:#16a34a">Conferida</span>'}
+        ${o.inat?`<span class="rtag" style="background:#eef2f7;color:#475569;border-color:#94a3b8">${o.inat} fora da análise</span>`:""}</div>
+    </div>
+    ${o.secoes.map(secao).join("")}
+    <div class="rtotal"><span>Total da obra</span><b>${brl(o.total)}</b></div>`;
+  return `<div class="rhead"><h1>${c.titulo}</h1>
+      <div class="sub">${c.sub}</div>${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
+    <div class="rsec" style="border-color:#334155">
+      <div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
+        <span>Resumo</span><span class="rcont">${d.obras.length} obras · ${d.itens} serviços</span>
+        <span class="rtot">${brl(d.total)}</span></div>
+      <table><thead><tr><th>Situação</th><th class="r">Serviços</th><th class="r">Valor</th></tr></thead>
+      <tbody>${d.porSit.map(x=>`<tr><td style="color:${SIT_TEMA[x.sit].txt};font-weight:600">${SIT_TEMA[x.sit].ico} ${x.sit}</td>
+        <td class="r">${x.n}</td><td class="r"><b>${brl(x.v)}</b></td></tr>`).join("")}</tbody>
+      <tfoot><tr style="background:#eef2f7"><th>Total</th><th class="r">${d.itens}</th><th class="r">${brl(d.total)}</th></tr></tfoot></table></div>
+    ${d.det ? d.obras.map(obra).join("")
+      : `<div class="rsec" style="border-color:#334155"><div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
+          <span>Totais por obra</span><span class="rcont">${d.obras.length} obras</span><span class="rtot">${brl(d.total)}</span></div>
+        <table><thead><tr><th>Obra</th><th>Descrição</th><th>Município</th><th class="r">Serviços</th><th class="r">Valor</th></tr></thead>
+        <tbody>${d.obras.map(o=>`<tr><td>${o.obra}</td><td>${esc(o.desc)}</td><td>${esc(o.mun)}</td>
+          <td class="r">${o.itens.length}</td><td class="r"><b>${brl(o.total)}</b></td></tr>`).join("")}</tbody>
+        <tfoot><tr style="background:#eef2f7"><th colspan="3">Total</th><th class="r">${d.itens}</th><th class="r">${brl(d.total)}</th></tr></tfoot></table></div>`}`;
+}
+
+document.getElementById("relFechar").onclick=()=>{document.getElementById("relmodal").hidden=true};
+document.getElementById("relmodal").addEventListener("click",e=>{if(e.target.id==="relmodal")document.getElementById("relmodal").hidden=true});
+document.querySelectorAll("#relOpcoes input,#relDetalhe").forEach(i=>i.addEventListener("change",relResumo));
+function abrirRelatorio(obra){
+  relObra=obra||null;
+  document.getElementById("relEscopo").innerHTML = relObra
+    ? `Escopo: <b>somente a obra ${relObra}</b>.` : "Escopo: <b>todas as obras</b> do filtro atual.";
+  document.getElementById("relmodal").hidden=false; relResumo();
+}
+document.getElementById("btnRel").onclick=()=>abrirRelatorio(null);
+
+document.getElementById("relPdf").onclick=()=>{
+  const d=relDados();
+  if(!d.sits.length||!d.obras.length){alert("Nada a incluir com as opções marcadas.");return}
+  const alvo=document.getElementById("relprint");
+  alvo.innerHTML=relHTML(); alvo.hidden=false;
+  document.body.classList.add("imprimindo");
+  const limpar=()=>{document.body.classList.remove("imprimindo");alvo.hidden=true;window.removeEventListener("afterprint",limpar)};
+  window.addEventListener("afterprint",limpar);
+  window.print(); setTimeout(limpar,1500);
+};
+
+/* ---------- PNG: desenho no canvas com o mesmo padrão ---------- */
+document.getElementById("relPng").onclick=()=>{
+  const d=relDados();
+  if(!d.sits.length||!d.obras.length){alert("Nada a incluir com as opções marcadas.");return}
+  const c=relCabecalho();
+  const W=1560, P=30, L=20, HS=30, HO=44;      /* largura, margem, linha, altura seção, altura obra */
+  const el=[];
+  el.push(["tit",c.titulo]); el.push(["sub",c.sub]);
+  if(c.filtros) el.push(["sub",c.filtros]);
+  el.push(["esp",8]);
+  el.push(["sec",{sit:null,rot:"Resumo",cont:`${d.obras.length} obras · ${d.itens} serviços`,total:d.total,tema:{bg:"#eef2f7",txt:"#0f172a",bar:"#334155",ico:""}}]);
+  el.push(["cabres"]);
+  d.porSit.forEach(x=>el.push(["res",x]));
+  el.push(["totres",d]);
+  if(d.det){
+    d.obras.forEach(o=>{
+      el.push(["esp",14]); el.push(["obra",o]);
+      o.secoes.forEach(s=>{
+        el.push(["esp",6]);
+        el.push(["sec",{sit:s.sit,rot:s.sit,cont:`${s.itens.length} serviços · ${s.inst} inst. / ${s.retir} retir.`,total:s.total,tema:SIT_TEMA[s.sit]}]);
+        el.push(["cab"]);
+        s.itens.forEach(x=>el.push(["item",x]));
+        el.push(["fim",s]);
+      });
+      el.push(["totobra",o]);
+    });
+  }else{
+    el.push(["esp",14]);
+    el.push(["sec",{sit:null,rot:"Totais por obra",cont:d.obras.length+" obras",total:d.total,tema:{bg:"#eef2f7",txt:"#0f172a",bar:"#334155",ico:""}}]);
+    el.push(["cabo"]);
+    d.obras.forEach(o=>el.push(["obral",o]));
+  }
+  const alt=t=>t==="esp"?0:t==="tit"?34:t==="sub"?15:t==="sec"?HS:t==="obra"?HO:t==="totobra"?34:L;
+  const H=P*2+el.reduce((a,e)=>a+(e[0]==="esp"?e[1]:alt(e[0])),0);
+  const cv=document.createElement("canvas"), k=2;
+  cv.width=W*k; cv.height=H*k;
+  const g=cv.getContext("2d"); g.scale(k,k);
+  g.fillStyle="#ffffff"; g.fillRect(0,0,W,H);
+  const X={cod:P+10,op:P+80,serv:P+165,apont:W-560,pago:W-460,dif:W-350,valor:W-P-10};
+  const txt=(t,x,y,cor,peso,tam,dir)=>{g.fillStyle=cor;g.font=`${peso} ${tam}px system-ui,Segoe UI,Arial`;
+    g.textAlign=dir||"left";g.fillText(String(t),x,y)};
+  const corta=(t,max)=>{t=String(t);g.font="400 12px system-ui,Segoe UI,Arial";
+    while(g.measureText(t).width>max&&t.length>3)t=t.slice(0,-2); return t};
+  let y=P, zebra=false;
+  for(const e of el){
+    const [tipo,v]=e;
+    if(tipo==="esp"){y+=v;continue}
+    if(tipo==="tit"){y+=24;txt(v,P,y,"#0f172a","800",21);y+=10;continue}
+    if(tipo==="sub"){y+=14;txt(v,P,y,"#64748b","400",11.5);continue}
+    if(tipo==="obra"){
+      y+=20; txt("Obra "+v.obra,P+12,y,"#0f172a","800",17);
+      g.fillStyle="#0284c7"; g.fillRect(P,y-16,4,38);
+      y+=17; txt(`${v.desc}${v.mun?" · "+v.mun:""}`,P+12,y,"#64748b","400",12);
+      y+=7; continue;
+    }
+    if(tipo==="sec"){
+      y+=HS; const t=v.tema;
+      g.fillStyle=t.bg; g.fillRect(P,y-21,W-2*P,26);
+      g.fillStyle=t.bar; g.fillRect(P,y+4,W-2*P,2);
+      txt(`${t.ico?t.ico+" ":""}${v.rot}`,P+12,y-4,t.txt,"800",14);
+      const larg=g.measureText(`${t.ico?t.ico+" ":""}${v.rot}`).width;
+      txt(v.cont,P+24+larg,y-4,t.txt,"600",11.5);
+      txt(brl(v.total),W-P-12,y-4,t.txt,"800",15,"right");
+      zebra=false; continue;
+    }
+    if(tipo==="cab"||tipo==="cabres"||tipo==="cabo"){
+      y+=L; g.fillStyle="#f1f5f9"; g.fillRect(P,y-14,W-2*P,L);
+      if(tipo==="cab"){
+        txt("Código",X.cod,y,"#475569","700",11); txt("Op.",X.op,y,"#475569","700",11);
+        txt("Serviço",X.serv,y,"#475569","700",11);
+        txt("Apontado",X.apont,y,"#475569","700",11,"right"); txt("Pago",X.pago,y,"#475569","700",11,"right");
+        txt("Diferença",X.dif,y,"#475569","700",11,"right"); txt("Valor",X.valor,y,"#475569","700",11,"right");
+      }else if(tipo==="cabres"){
+        txt("Situação",X.cod,y,"#475569","700",11); txt("Serviços",X.dif,y,"#475569","700",11,"right");
+        txt("Valor",X.valor,y,"#475569","700",11,"right");
+      }else{
+        txt("Obra",X.cod,y,"#475569","700",11); txt("Descrição",P+120,y,"#475569","700",11);
+        txt("Município",W-620,y,"#475569","700",11);
+        txt("Serviços",X.dif,y,"#475569","700",11,"right"); txt("Valor",X.valor,y,"#475569","700",11,"right");
+      }
+      continue;
+    }
+    if(tipo==="res"){
+      y+=L; if(zebra){g.fillStyle="#f8fafc";g.fillRect(P,y-14,W-2*P,L)} zebra=!zebra;
+      const t=SIT_TEMA[v.sit];
+      txt(`${t.ico} ${v.sit}`,X.cod,y,t.txt,"600",12);
+      txt(v.n,X.dif,y,"#334155","400",12,"right"); txt(brl(v.v),X.valor,y,"#0f172a","700",12,"right");
+      continue;
+    }
+    if(tipo==="totres"){
+      y+=L; g.fillStyle="#eef2f7"; g.fillRect(P,y-14,W-2*P,L);
+      txt("Total",X.cod,y,"#0f172a","800",12);
+      txt(v.itens,X.dif,y,"#0f172a","800",12,"right"); txt(brl(v.total),X.valor,y,"#0f172a","800",12,"right");
+      continue;
+    }
+    if(tipo==="fim"){
+      y+=L; const t=SIT_TEMA[v.sit]; g.fillStyle=t.bg; g.fillRect(P,y-14,W-2*P,L);
+      txt(v.sit+" — total",X.cod,y,t.txt,"700",12); txt(brl(v.total),X.valor,y,t.txt,"800",12,"right");
+      continue;
+    }
+    if(tipo==="totobra"){
+      y+=28; g.strokeStyle="#0284c7"; g.lineWidth=2; g.strokeRect(P,y-19,W-2*P,26);
+      txt("Total da obra",P+12,y-2,"#0f172a","700",13.5);
+      txt(brl(v.total),W-P-12,y-2,"#0284c7","800",16,"right"); y+=6; continue;
+    }
+    if(tipo==="obral"){
+      y+=L; if(zebra){g.fillStyle="#f8fafc";g.fillRect(P,y-14,W-2*P,L)} zebra=!zebra;
+      txt(v.obra,X.cod,y,"#0f172a","600",11.5); txt(corta(v.desc,W-760),P+120,y,"#334155","400",11.5);
+      txt(v.mun,W-620,y,"#334155","400",11.5); txt(v.itens.length,X.dif,y,"#334155","400",11.5,"right");
+      txt(brl(v.total),X.valor,y,"#0f172a","700",11.5,"right"); continue;
+    }
+    /* item */
+    y+=L; if(zebra){g.fillStyle="#f8fafc";g.fillRect(P,y-14,W-2*P,L)} zebra=!zebra;
+    g.strokeStyle="#e2e8f0"; g.lineWidth=1; g.beginPath(); g.moveTo(P,y+5.5); g.lineTo(W-P,y+5.5); g.stroke();
+    txt(v.cod,X.cod,y,"#334155","400",11.5);
+    txt(v.op==="I"?"▲ Inst.":"▼ Retir.",X.op,y,v.op==="I"?"#16a34a":"#dc2626","700",11.5);
+    txt(corta(v.serv,X.apont-X.serv-70),X.serv,y,"#0f172a","400",11.5);
+    txt(nnum(v.qa),X.apont,y,"#334155","400",11.5,"right");
+    txt(nnum(v.qp),X.pago,y,"#334155","400",11.5,"right");
+    txt(nnum(v.dif),X.dif,y,"#334155","400",11.5,"right");
+    txt(brl(Math.abs(v.vdif)),X.valor,y,"#0f172a","700",11.5,"right");
+  }
+  cv.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);
+    a.download=(relObra?`confronto-obra-${relObra}`:`confronto-${new Date().toISOString().slice(0,10)}`)+".png";
+    a.click()},"image/png");
+};
 
 /* ---------- tema claro/escuro ---------- */
 const btnTema=document.getElementById("tema");
