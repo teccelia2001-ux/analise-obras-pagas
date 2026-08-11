@@ -64,6 +64,12 @@ tr.obra:hover{background:var(--head)}
 .c-antigo{background:rgba(148,163,184,.16);color:var(--muted);border-color:var(--muted)}
 [data-tema="claro"] .c-novo{background:#f3e8ff;color:#7e22ce;border-color:#a855f7}
 [data-tema="claro"] .c-antigo{background:#eef2f7;color:#475569;border-color:#94a3b8}
+tr.inativo td{opacity:.45;text-decoration:line-through}
+tr.inativo td.acao{opacity:1;text-decoration:none}
+button.mini{padding:2px 8px;font-size:11px;border-radius:99px;background:var(--panel2);border-color:var(--line);color:var(--muted);font-weight:600}
+button.mini:hover{background:var(--bad);border-color:var(--bad);color:#fff}
+button.mini.reativar:hover{background:var(--ok);border-color:var(--ok)}
+td.acao{text-align:right;white-space:nowrap}
 td.op-i{color:var(--ok-txt);font-weight:700;white-space:nowrap}
 td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 [data-tema="claro"] td.op-i{color:var(--ok)}
@@ -169,6 +175,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
     <button class="sec" id="limpar">Limpar</button>
     <button id="csv">Exportar CSV</button>
     <button id="xlsx">⬇️ Baixar Excel filtrado</button>
+    <button class="sec" id="btnInat" hidden></button>
   </div>
 
   <div class="tabs">
@@ -333,13 +340,25 @@ document.getElementById("tbl").tHead.addEventListener("click",e=>{
 /* ---------- confronto apontado (termômetro) x pago (medição) ---------- */
 const SIT_CLS={"Pendente de pagamento":"s-pend","Pendente parcial":"s-parc","Pago a mais":"s-maior",
   "Pago sem apontamento":"s-sem","Conferido":"s-ok","Obra não encontrada no termômetro":"s-nao"};
+let INATIVOS=new Set();
+try{const g=localStorage.getItem("confronto-inativos"); if(g) INATIVOS=new Set(JSON.parse(g))}catch(e){}
+const chaveInat=(obra,op,cod)=>obra+"|"+op+"|"+cod;
+function salvarInativos(){try{localStorage.setItem("confronto-inativos",JSON.stringify([...INATIVOS]))}catch(e){}}
+function alternarInativo(obra,op,cod){
+  const k=chaveInat(obra,op,cod);
+  INATIVOS.has(k)?INATIVOS.delete(k):INATIVOS.add(k);
+  salvarInativos(); desenharFichaConfronto(); render();
+}
 function confrontoPorObra(){
   const m=new Map();
   for(const r of CONFRONTO.linhas){
+    /* itens inativos não somam nos totais */
     const [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
-    if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,conf:0,naoenc:false,itens:[]});
+    if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,conf:0,inat:0,naoenc:false,itens:[]});
     const g=m.get(obra);
-    g.itens.push({op,cod,serv,qa,qp,dif,vdif,sit});
+    const inativo=INATIVOS.has(chaveInat(obra,op,cod));
+    g.itens.push({op,cod,serv,qa,qp,dif,vdif,sit,inativo});
+    if(inativo){g.inat=(g.inat||0)+1; continue}
     if(sit==="Obra não encontrada no termômetro") g.naoenc=true;
     if(sit==="Pendente de pagamento"||sit==="Pendente parcial"){g.pend+=vdif;g.div++}
     else if(sit==="Pago a mais"){g.maior+=Math.abs(vdif);g.div++}
@@ -371,7 +390,7 @@ function renderConfronto(){
 
   const t=document.getElementById("tbl");
   t.tHead.innerHTML=`<tr><th>Nº da obra</th><th>Descrição da obra</th><th>Município</th>
-    <th class="num">Divergências</th><th class="num">Conferidos</th>
+    <th class="num">Divergências</th><th class="num">Conferidos</th><th class="num">Fora da análise</th>
     <th class="num" data-k="pend">Pendente de pagamento${sortKey==="pend"?(sortDir>0?" ▲":" ▼"):""}</th>
     <th class="num">Pago a mais</th><th class="num">Sem apontamento</th><th>Situação</th></tr>`;
   t.tBodies[0].innerHTML=G.slice(0,limite).map(g=>{
@@ -382,12 +401,13 @@ function renderConfronto(){
              : `<span class="tag s-ok">Conferida</span>`;
     return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}</td>
       <td class="trunc" title="${esc(desc)}">${esc(desc)||"—"}</td><td>${esc(g.mun)}</td>
-      <td class="num">${g.div}</td><td class="num">${g.conf}</td>
+      <td class="num">${g.div}</td><td class="num">${g.conf}</td><td class="num">${g.inat||"—"}</td>
       <td class="num">${g.pend?brl(g.pend):"—"}</td><td class="num">${g.maior?brl(g.maior):"—"}</td>
       <td class="num">${g.sem?brl(g.sem):"—"}</td><td>${et}</td></tr>`}).join("")
-    ||`<tr><td colspan="9" class="muted" style="padding:20px">Nenhuma obra no filtro atual.</td></tr>`;
+    ||`<tr><td colspan="10" class="muted" style="padding:20px">Nenhuma obra no filtro atual.</td></tr>`;
   document.getElementById("info").textContent=`Exibindo ${Math.min(limite,G.length)} de ${nnum(G.length)} obras`;
   document.getElementById("mais").hidden=G.length<=limite;
+  atualizarBotaoInativos(true);
   window._exp={head:[["obra","Nº da obra"],["mun","Município"],["div","Divergências"],["conf","Conferidos"],
       ["pend","Pendente de pagamento"],["maior","Pago a mais"],["sem","Pago sem apontamento"]],dados:G};
 }
@@ -405,10 +425,12 @@ function desenharFichaConfronto(){
 
   const bloco=(titulo,cls,ico,filtro,textoVazio)=>{
     const it=ordena(g.itens.filter(filtro));
-    const sv=it.reduce((a,x)=>a+Math.abs(x.vdif),0);
+    const ativos=it.filter(x=>!x.inativo);
+    const sv=ativos.reduce((a,x)=>a+Math.abs(x.vdif),0);
+    const nInat=it.length-ativos.length;
     if(!it.length) return "";
     return `<div class="secao ${cls}">
-      <div class="stitulo">${ico} ${titulo} <span class="cont">${it.length} serviços · ${it.filter(x=>x.op==="I").length} inst. / ${it.filter(x=>x.op==="R").length} retir.</span><span class="stot">${brl(sv)}</span></div>
+      <div class="stitulo">${ico} ${titulo} <span class="cont">${ativos.length} serviços · ${ativos.filter(x=>x.op==="I").length} inst. / ${ativos.filter(x=>x.op==="R").length} retir.${nInat?" · "+nInat+" inativo(s)":""}</span><span class="stot">${brl(sv)}</span></div>
       <table class="ftbl"><thead><tr>
         <th data-k="cod">Código${seta("cod")}</th>
         <th>Op.</th>
@@ -417,11 +439,13 @@ function desenharFichaConfronto(){
         <th class="num" data-k="qp">Pago${seta("qp")}</th>
         <th class="num" data-k="dif">Diferença${seta("dif")}</th>
         <th class="num" data-k="vdif">Valor${seta("vdif")}</th>
+        <th></th>
       </tr></thead><tbody>
-      ${it.map(x=>`<tr><td>${x.cod}</td><td class="${x.op==="I"?"op-i":"op-r"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td><td>${esc(x.serv)}</td>
+      ${it.map(x=>`<tr class="${x.inativo?"inativo":""}"><td>${x.cod}</td><td class="${x.op==="I"?"op-i":"op-r"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td><td>${esc(x.serv)}</td>
         <td class="num">${nnum(x.qa)}</td><td class="num">${nnum(x.qp)}</td>
-        <td class="num">${nnum(x.dif)}</td><td class="num">${brl(Math.abs(x.vdif))}</td></tr>`).join("")}
-      </tbody><tfoot><tr><th colspan="5">${titulo} — total</th><th class="num"></th><th class="num">${brl(sv)}</th></tr></tfoot></table></div>`;
+        <td class="num">${nnum(x.dif)}</td><td class="num">${brl(Math.abs(x.vdif))}</td>
+        <td class="acao"><button class="mini ${x.inativo?"reativar":""}" data-inat="${g.obra}|${x.op}|${x.cod}" title="${x.inativo?"Voltar a considerar este serviço":"Tirar este serviço da análise"}">${x.inativo?"Reativar":"Desativar"}</button></td></tr>`).join("")}
+      </tbody><tfoot><tr><th colspan="5">${titulo} — total</th><th class="num"></th><th class="num">${brl(sv)}</th><th></th></tr></tfoot></table></div>`;
   };
 
   const naoenc = g.naoenc ? `<div class="secao r"><div class="stitulo">⚠️ Obra não encontrada no termômetro</div>
@@ -441,12 +465,29 @@ function desenharFichaConfronto(){
     ${bloco("Pago sem apontamento","r","🔵",x=>x.sit==="Pago sem apontamento")}
     ${bloco("Serviços não encontrados no termômetro","r","⚠️",x=>x.sit==="Obra não encontrada no termômetro")}
     ${bloco("Conferido (apontado = pago)","i","✅",x=>x.sit==="Conferido")}
-    <div class="ftotal"><span>Pendente de pagamento nesta obra <span class="muted" style="font-size:12px;font-weight:500">· ${conferidos} serviços conferidos</span></span><b>${brl(g.pend)}</b></div>`;
+    <div class="ftotal"><span>Pendente de pagamento nesta obra <span class="muted" style="font-size:12px;font-weight:500">· ${conferidos} serviços conferidos${g.inat?" · "+g.inat+" fora da análise":""}</span></span><b>${brl(g.pend)}</b></div>`;
   document.querySelectorAll("#mbody .ftbl thead").forEach(t=>t.onclick=e=>{
     const k=e.target.closest("th")?.dataset.k; if(!k)return;
     fichaSort={k,d:fichaSort.k===k?-fichaSort.d:1}; desenharFichaConfronto();
   });
+  document.getElementById("mbody").onclick=e=>{
+    const b=e.target.closest("button[data-inat]"); if(!b)return;
+    const [obra,op,cod]=b.dataset.inat.split("|"); alternarInativo(obra,op,cod);
+  };
 }
+
+function atualizarBotaoInativos(conf){
+  const b=document.getElementById("btnInat");
+  b.hidden = !conf || INATIVOS.size===0;
+  b.textContent = `↺ Reativar ${INATIVOS.size} serviço(s) fora da análise`;
+}
+document.getElementById("btnInat").onclick=()=>{
+  if(!INATIVOS.size) return;
+  if(!confirm(`Voltar a considerar os ${INATIVOS.size} serviços que estão fora da análise?`)) return;
+  INATIVOS.clear(); salvarInativos();
+  if(fichaObra&&fichaTipo==="conf") desenharFichaConfronto();
+  render();
+};
 
 /* ---------- ficha individual da obra ---------- */
 let fichaObra=null, fichaTipo="obra", fichaSort={k:"cd_mao_de_obra_descricao",d:1};
@@ -532,6 +573,7 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   ["fsit","fmo","fcon"].forEach(id=>document.getElementById(id).hidden=conf);
   document.getElementById("xlsx").hidden=conf;
   const av=document.getElementById("avisoConf"); av.hidden=!conf;
+  atualizarBotaoInativos(conf);
   if(conf) av.innerHTML="⚖️ <b>Apontado</b> = termômetro de serviços (planilha simplificada por obra, lida em 11/08/2026) · <b>Pago</b> = esta medição. "+
     "Abrange apenas o <b>novo contrato</b> (códigos 6xxxx): 39 obras da medição, 37 localizadas no termômetro.";
   render();
