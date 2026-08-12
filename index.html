@@ -897,14 +897,13 @@ function calcularConfronto(apont){
 /* script que o usuário cola no termômetro (somente leitura) */
 function scriptColeta(){
   const obras=JSON.stringify(obrasNovoContrato());
-  return `/* Cole no console do termômetro (F12) estando logado em ${TERMO_URL}
-   Ele apenas LÊ: pesquisa cada obra, gera a planilha simplificada em memória e copia o resultado. */
+  return `/* Coletor do confronto — roda dentro do termômetro, apenas LENDO.
+   Não altera dados e não baixa arquivos: as planilhas são lidas na memória. */
 (async()=>{
 const OBRAS=${obras};
 const cap=[]; const origURL=URL.createObjectURL;
 URL.createObjectURL=function(b){try{cap.push(b)}catch(e){} return origURL.call(URL,b)};
-/* nada é baixado: os arquivos gerados ficam só na memória.
-   O bundle importa saveAs internamente, então o bloqueio é feito no elemento/evento. */
+/* nada é baixado: o bundle importa saveAs internamente, então o bloqueio é no elemento/evento */
 const origSave=window.saveAs, origClick=HTMLAnchorElement.prototype.click,
       origDisp=EventTarget.prototype.dispatchEvent, origMs=navigator.msSaveBlob, origOpen=window.open;
 const ehDownload=el=>{try{return el instanceof HTMLAnchorElement && el.hasAttribute("download")}catch(e){return false}};
@@ -918,12 +917,33 @@ EventTarget.prototype.dispatchEvent=function(ev){
 window.open=function(u){ if(typeof u==="string" && u.startsWith("blob:")) return null; return origOpen.apply(window,arguments) };
 const restaurar=()=>{URL.createObjectURL=origURL; window.saveAs=origSave; navigator.msSaveBlob=origMs;
   HTMLAnchorElement.prototype.click=origClick; EventTarget.prototype.dispatchEvent=origDisp; window.open=origOpen};
+
+/* painel de progresso na tela */
+const painel=document.createElement("div");
+painel.style.cssText="position:fixed;right:16px;bottom:16px;z-index:999999;background:#0b1220;color:#e8eefc;"+
+ "font:13px system-ui,Segoe UI,Arial;padding:14px 16px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);"+
+ "min-width:290px;border:1px solid #2c3b57";
+painel.innerHTML='<div style="font-weight:700;margin-bottom:6px">Coletando apontamentos…</div>'+
+ '<div id="__cp" style="color:#93a3bf">iniciando</div>'+
+ '<div style="height:8px;background:#1c2942;border-radius:99px;margin-top:8px;overflow:hidden">'+
+ '<i id="__cb" style="display:block;height:100%;width:0;background:#38bdf8"></i></div>';
+document.body.appendChild(painel);
+const passo=(i,txt)=>{const p=document.getElementById("__cp"),b=document.getElementById("__cb");
+  if(p)p.textContent=txt; if(b)b.style.width=Math.round(i/OBRAS.length*100)+"%"};
+
 const inp=()=>[...document.querySelectorAll("input")].find(e=>e.placeholder==="Pesquisar OBRA");
 const btnBuscar=()=>[...document.querySelectorAll("button")][1];
 const btnPlan=()=>[...document.querySelectorAll("button")].find(b=>b.title==="Gerar Planilha Simplificado");
 const espera=ms=>new Promise(r=>setTimeout(r,ms));
+/* espera a condição acontecer em vez de esperar tempo fixo */
+const ate=async(cond,max=6000,p=120)=>{const t0=Date.now();
+  while(Date.now()-t0<max){ if(cond()) return true; await espera(p) } return false};
 const setVal=(el,v)=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value").set.call(el,v);
   el.dispatchEvent(new Event("input",{bubbles:true}))};
+const topo=()=>{const t=document.body.innerText,i=t.indexOf("ULTIMAS");
+  return t.slice(i,i+400).split("\\n").map(x=>x.trim()).filter(Boolean)};
+const equipeNaTela=()=>{const l=topo()[1]||""; return (!/Funcion|%|R\\$/.test(l)&&l)?l:""};
+
 async function lerZip(blob){
   const buf=new Uint8Array(await blob.arrayBuffer()), dv=new DataView(buf.buffer);
   let eo=-1; for(let i=buf.length-22;i>=0;i--){if(dv.getUint32(i,true)===0x06054b50){eo=i;break}}
@@ -949,17 +969,23 @@ async function lerZip(blob){
   }
   return L;
 }
+const t0=Date.now();
 const res={gerado:new Date().toISOString(),obras:{}};
-for(const obra of OBRAS){
+for(let i=0;i<OBRAS.length;i++){
+  const obra=OBRAS[i];
+  passo(i,\`obra \${obra} — \${i+1} de \${OBRAS.length}\`);
   cap.length=0;
-  setVal(inp(),obra); await espera(500); btnBuscar().click(); await espera(2200);
-  const t=document.body.innerText, i=t.indexOf("ULTIMAS");
-  const linhas=t.slice(i,i+400).split("\\n").map(x=>x.trim()).filter(Boolean);
-  const eq=(linhas[1]||""); const achou=!/Funcion|%|R\\$/.test(eq)&&!!eq;
+  const antes=equipeNaTela();
+  setVal(inp(),obra); await espera(120); btnBuscar().click();
+  await ate(()=>equipeNaTela()!==antes || !!btnPlan(), 5000);
+  await espera(200);
+  const eq=equipeNaTela(), achou=!!eq;
+  const linhas=topo();
   const reg={equipe:achou?eq:"",data:achou?(linhas[4]||""):"",itens:[]};
   const bp=btnPlan();
   if(achou&&bp){
-    bp.click(); await espera(2200);
+    bp.click();
+    await ate(()=>cap.length>0, 6000);
     if(cap.length){
       const L=await lerZip(cap[cap.length-1]); let secao="";
       for(const c of L){
@@ -975,10 +1001,22 @@ for(const obra of OBRAS){
   console.log(obra, reg.equipe||"(nao encontrada)", reg.itens.length+" itens");
 }
 restaurar();
+const seg=Math.round((Date.now()-t0)/1000);
+const comApont=Object.values(res.obras).filter(o=>o.itens.length).length;
 const txt=JSON.stringify(res);
-try{await navigator.clipboard.writeText(txt); console.log("%cCopiado! Volte ao sistema e cole no campo.","color:#16a34a;font-weight:bold")}
-catch(e){window.__resultado=txt; console.log("Copie manualmente: copy(window.__resultado)")}
-return "Concluido: "+Object.keys(res.obras).length+" obras";
+let copiou=false;
+try{await navigator.clipboard.writeText(txt); copiou=true}catch(e){window.__resultado=txt}
+painel.innerHTML='<div style="font-weight:800;color:#86efac;font-size:15px;margin-bottom:6px">✅ Coleta concluída</div>'+
+ '<div style="color:#e8eefc"><b>'+OBRAS.length+'</b> obras em <b>'+seg+'s</b> · '+comApont+' com apontamento</div>'+
+ '<div style="color:#93a3bf;margin-top:6px">'+(copiou
+   ? 'Resultado copiado. Volte ao sistema, cole no campo e clique em <b>Aplicar</b>.'
+   : 'Não consegui copiar: rode <b>copy(window.__resultado)</b> no console.')+'</div>'+
+ '<button id="__cf" style="margin-top:10px;padding:6px 12px;border-radius:8px;border:0;background:#2563eb;color:#fff;'+
+ 'font:600 12px system-ui;cursor:pointer">Fechar</button>';
+document.getElementById("__cf").onclick=()=>painel.remove();
+setTimeout(()=>{if(painel.isConnected)painel.remove()},60000);
+alert("Coleta concluída: "+OBRAS.length+" obras em "+seg+"s.\\n"+(copiou?"Resultado copiado — cole no sistema.":"Rode copy(window.__resultado) no console."));
+return "Concluido: "+OBRAS.length+" obras em "+seg+"s";
 })()`;
 }
 
