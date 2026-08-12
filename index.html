@@ -263,10 +263,16 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
       <p id="termoInfo" style="margin-top:0;font-size:13px"></p>
       <p class="muted" style="font-size:12.5px">O termômetro exige login, por isso a coleta roda dentro dele — em três passos. Nada é alterado lá: o script só pesquisa cada obra e lê a planilha simplificada.</p>
       <ol style="font-size:13px;padding-left:20px;line-height:1.7">
-        <li><button id="termoCopiar">1 · Copiar script de coleta</button></li>
+        <li><button id="termoCopiar">1 · Copiar script de coleta</button>
+          <button class="sec" id="termoMarcador" style="margin-left:6px">ou copiar como favorito (sem console)</button></li>
         <li><button class="sec" id="termoAbrir">2 · Abrir o termômetro</button> — estando logado, tecle <b>F12</b> e vá na aba <b>Console</b>.
           <div class="avisoChrome">⚠️ Na primeira vez o Chrome mostra um aviso vermelho e bloqueia a colagem. É proteção do navegador contra scripts de estranhos: digite <b>allow pasting</b> no console, dê Enter e só então cole o script. O aviso não volta a aparecer.</div>
-          Cole e dê Enter. A coleta leva cerca de 4 segundos por obra — acompanhe o progresso no próprio console.</li>
+          Cole e dê Enter. A coleta leva cerca de 4 segundos por obra — acompanhe o progresso no próprio console.
+          <details style="margin-top:6px"><summary style="cursor:pointer;font-size:12.5px">O Chrome continua bloqueando a colagem? Veja dois caminhos que dispensam o console</summary>
+            <div style="font-size:12.5px;line-height:1.6;margin-top:6px">
+              <b>A · Favorito (mais simples):</b> clique em <i>“ou copiar como favorito”</i> acima. No Chrome, tecle <b>Ctrl+Shift+O</b> (Gerenciador de favoritos) → menu <b>⋮</b> → <b>Adicionar novo favorito</b> → em <b>URL</b> cole o que foi copiado, dê um nome (ex.: Coletar termômetro) e salve. Depois, abra o termômetro logado e clique nesse favorito na barra — a coleta começa sozinha.<br>
+              <b>B · Snippets:</b> no F12, aba <b>Sources</b> → painel <b>Snippets</b> → <b>New snippet</b> → cole ali (esse editor não tem o bloqueio) e rode com <b>Ctrl+Enter</b>.
+            </div></details></li>
         <li>Ao terminar, o resultado é copiado sozinho. Cole abaixo e clique em aplicar:</li>
       </ol>
       <textarea id="termoCola" placeholder="Cole aqui o resultado da coleta" style="width:100%;height:90px;font:12px monospace;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
@@ -986,6 +992,14 @@ document.getElementById("termoCopiar").onclick=async()=>{
     el.innerHTML="Não consegui copiar sozinho — o script está no campo abaixo, selecione tudo e copie (Ctrl+C).";}
 };
 document.getElementById("termoAbrir").onclick=()=>window.open(TERMO_URL,"_blank","noopener");
+document.getElementById("termoMarcador").onclick=async()=>{
+  const bm="javascript:"+encodeURIComponent(scriptColeta().replace(/\/\*[\s\S]*?\*\//g,"").trim());
+  const el=document.getElementById("termoRes");
+  try{await navigator.clipboard.writeText(bm);
+    el.innerHTML="✅ Endereço do favorito copiado. Crie um favorito novo e cole isso no campo <b>URL</b> — depois é só clicar nele dentro do termômetro.";}
+  catch(e){const t=document.getElementById("termoCola"); t.value=bm; t.select();
+    el.innerHTML="Está no campo abaixo: selecione tudo, copie e cole na URL de um favorito novo.";}
+};
 document.getElementById("termoAplicar").onclick=()=>{
   const el=document.getElementById("termoRes");
   let dados;
