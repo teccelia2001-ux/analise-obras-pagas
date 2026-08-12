@@ -909,13 +909,21 @@ function scriptColeta(){
 const OBRAS=${obras};
 const cap=[]; const origURL=URL.createObjectURL;
 URL.createObjectURL=function(b){try{cap.push(b)}catch(e){} return origURL.call(URL,b)};
-/* nada é baixado: os arquivos gerados ficam só na memória */
-const origSave=window.saveAs, origClick=HTMLAnchorElement.prototype.click, origMs=navigator.msSaveBlob;
+/* nada é baixado: os arquivos gerados ficam só na memória.
+   O bundle importa saveAs internamente, então o bloqueio é feito no elemento/evento. */
+const origSave=window.saveAs, origClick=HTMLAnchorElement.prototype.click,
+      origDisp=EventTarget.prototype.dispatchEvent, origMs=navigator.msSaveBlob, origOpen=window.open;
+const ehDownload=el=>{try{return el instanceof HTMLAnchorElement && el.hasAttribute("download")}catch(e){return false}};
 window.saveAs=function(b){try{if(b)cap.push(b)}catch(e){}};
 navigator.msSaveBlob=function(b){try{if(b)cap.push(b)}catch(e){} return true};
-HTMLAnchorElement.prototype.click=function(){ if(this.hasAttribute("download")) return; return origClick.call(this) };
-const restaurar=()=>{URL.createObjectURL=origURL; window.saveAs=origSave;
-  HTMLAnchorElement.prototype.click=origClick; navigator.msSaveBlob=origMs};
+HTMLAnchorElement.prototype.click=function(){ if(ehDownload(this)) return; return origClick.call(this) };
+EventTarget.prototype.dispatchEvent=function(ev){
+  if(ev && ev.type==="click" && ehDownload(this)) return true;
+  return origDisp.call(this,ev);
+};
+window.open=function(u){ if(typeof u==="string" && u.startsWith("blob:")) return null; return origOpen.apply(window,arguments) };
+const restaurar=()=>{URL.createObjectURL=origURL; window.saveAs=origSave; navigator.msSaveBlob=origMs;
+  HTMLAnchorElement.prototype.click=origClick; EventTarget.prototype.dispatchEvent=origDisp; window.open=origOpen};
 const inp=()=>[...document.querySelectorAll("input")].find(e=>e.placeholder==="Pesquisar OBRA");
 const btnBuscar=()=>[...document.querySelectorAll("button")][1];
 const btnPlan=()=>[...document.querySelectorAll("button")].find(b=>b.title==="Gerar Planilha Simplificado");
