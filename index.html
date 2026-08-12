@@ -261,7 +261,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
       <button class="sec" id="termoFechar">Fechar ✕</button></div>
     <div style="padding:16px">
       <p id="termoInfo" style="margin-top:0;font-size:13px"></p>
-      <p class="muted" style="font-size:12.5px">O termômetro exige login, por isso a coleta roda dentro dele — em três passos. Nada é alterado lá: o script só pesquisa cada obra e lê a planilha simplificada.</p>
+      <p class="muted" style="font-size:12.5px">O termômetro exige login, por isso a coleta roda dentro dele — em três passos. Nada é alterado lá e <b>nenhum arquivo é baixado</b>: as planilhas geradas são lidas na memória e descartadas.</p>
       <ol style="font-size:13px;padding-left:20px;line-height:1.7">
         <li><button id="termoCopiar">1 · Copiar script de coleta</button>
           <button class="sec" id="termoMarcador" style="margin-left:6px">ou copiar como favorito (sem console)</button></li>
@@ -909,6 +909,13 @@ function scriptColeta(){
 const OBRAS=${obras};
 const cap=[]; const origURL=URL.createObjectURL;
 URL.createObjectURL=function(b){try{cap.push(b)}catch(e){} return origURL.call(URL,b)};
+/* nada é baixado: os arquivos gerados ficam só na memória */
+const origSave=window.saveAs, origClick=HTMLAnchorElement.prototype.click, origMs=navigator.msSaveBlob;
+window.saveAs=function(b){try{if(b)cap.push(b)}catch(e){}};
+navigator.msSaveBlob=function(b){try{if(b)cap.push(b)}catch(e){} return true};
+HTMLAnchorElement.prototype.click=function(){ if(this.hasAttribute("download")) return; return origClick.call(this) };
+const restaurar=()=>{URL.createObjectURL=origURL; window.saveAs=origSave;
+  HTMLAnchorElement.prototype.click=origClick; navigator.msSaveBlob=origMs};
 const inp=()=>[...document.querySelectorAll("input")].find(e=>e.placeholder==="Pesquisar OBRA");
 const btnBuscar=()=>[...document.querySelectorAll("button")][1];
 const btnPlan=()=>[...document.querySelectorAll("button")].find(b=>b.title==="Gerar Planilha Simplificado");
@@ -965,7 +972,7 @@ for(const obra of OBRAS){
   res.obras[obra]=reg;
   console.log(obra, reg.equipe||"(nao encontrada)", reg.itens.length+" itens");
 }
-URL.createObjectURL=origURL;
+restaurar();
 const txt=JSON.stringify(res);
 try{await navigator.clipboard.writeText(txt); console.log("%cCopiado! Volte ao sistema e cole no campo.","color:#16a34a;font-weight:bold")}
 catch(e){window.__resultado=txt; console.log("Copie manualmente: copy(window.__resultado)")}
