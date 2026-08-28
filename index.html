@@ -1478,6 +1478,10 @@ const relSelecionadas=()=>[...document.querySelectorAll("#relOpcoes input:checke
 
 let relObra=null;   /* quando preenchido, o relatório cobre só esta obra */
 
+/* o que foi pago a mais abate o pendente: entra com sinal negativo nos totais */
+const relSinal=sit=>(sit==="Pago a mais"||sit==="Pago sem apontamento")?-1:1;
+const relVal=x=>relSinal(x.sit)*Math.abs(x.vdif);
+
 /* respeita os filtros da aba e ignora os serviços desativados */
 function relDados(){
   const sits=relSelecionadas(), det=document.getElementById("relDetalhe").checked;
@@ -1494,12 +1498,12 @@ function relDados(){
     const secoes=sits.map(sit=>{
       const its=itens.filter(x=>x.sit===sit).sort((a,b)=>
         a.op!==b.op ? (a.op==="I"?-1:1) : String(a.serv).localeCompare(String(b.serv),"pt-BR"));
-      return {sit,itens:its,total:its.reduce((a,x)=>a+Math.abs(x.vdif),0),
+      return {sit,itens:its,total:its.reduce((a,x)=>a+relVal(x),0),
               inst:its.filter(x=>x.op==="I").length, retir:its.filter(x=>x.op==="R").length};
     }).filter(s=>s.itens.length);
     out.push({obra:g.obra,mun:g.mun,desc:(META[g.obra]||{}).desc||"",equipe:(EQUIPES[g.obra]||{}).equipe||"",secoes,itens,
       pend:g.pend, naoenc:g.naoenc, inat:g.inat||0,
-      total:itens.reduce((a,x)=>a+Math.abs(x.vdif),0)});
+      total:itens.reduce((a,x)=>a+relVal(x),0)});
   }
   out.sort((a,b)=>b.total-a.total);
   return {obras:out,sits,det,
@@ -1507,7 +1511,7 @@ function relDados(){
     itens:out.reduce((a,o)=>a+o.itens.length,0),
     porSit:sits.map(s=>({sit:s,
       n:out.reduce((a,o)=>a+o.itens.filter(x=>x.sit===s).length,0),
-      v:out.reduce((a,o)=>a+o.itens.filter(x=>x.sit===s).reduce((b,x)=>b+Math.abs(x.vdif),0),0)}))
+      v:out.reduce((a,o)=>a+o.itens.filter(x=>x.sit===s).reduce((b,x)=>b+relVal(x),0),0)}))
       .filter(x=>x.n)};
 }
 function relResumo(){
