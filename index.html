@@ -92,6 +92,12 @@ button.cobrar{background:#ca8a04;border-color:#ca8a04}
 @media (max-width:700px){input.qtd{width:62px}}
 tr.inativo td{opacity:.45;text-decoration:line-through}
 tr.inativo td.acao{opacity:1;text-decoration:none}
+tr.inativo td.cChk{opacity:1;text-decoration:none}
+th.cChk,td.cChk{width:30px;text-align:center;padding-left:6px;padding-right:0}
+td.cChk input{cursor:pointer;width:15px;height:15px;accent-color:var(--ok,#16a34a)}
+tr.jaconf td{background:rgba(22,163,74,.10)}
+tr.jaconf td:first-child{box-shadow:inset 3px 0 0 var(--ok,#16a34a)}
+tr.jaconf.inativo td{background:transparent}
 button.mini{padding:2px 8px;font-size:11px;border-radius:99px;background:var(--panel2);border-color:var(--line);color:var(--muted);font-weight:600}
 button.mini:hover{background:var(--bad);border-color:var(--bad);color:#fff}
 button.mini.reativar:hover{background:var(--ok);border-color:var(--ok)}
@@ -632,6 +638,29 @@ function editarQtd(obra,op,cod,campo,valor){
   invalidarConfronto(); salvarEdicoes(); desenharFichaConfronto(); render();
 }
 function limparEdicoes(){EDICOES={};salvarEdicoes()}
+/* itens já conferidos em campo — só marcação visual, não mexe em nenhum total */
+let CONFERIDOS={};
+try{const c=localStorage.getItem("confronto-conferidos"); if(c) CONFERIDOS=JSON.parse(c)}catch(e){}
+function salvarConferidos(){try{localStorage.setItem("confronto-conferidos",JSON.stringify(CONFERIDOS))}catch(e){}}
+function alternarConferido(obra,op,cod){
+  const k=chaveInat(obra,op,cod);
+  if(CONFERIDOS[k]) delete CONFERIDOS[k];
+  else CONFERIDOS[k]={em:new Date().toLocaleDateString("pt-BR")};
+  salvarConferidos(); desenharFichaConfronto(); render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
+function conferidosDaObra(obra){
+  const p=obra+"|";
+  return Object.keys(CONFERIDOS).filter(k=>k.startsWith(p)).length;
+}
+function limparConferidosObra(obra){
+  const p=obra+"|", ks=Object.keys(CONFERIDOS).filter(k=>k.startsWith(p));
+  if(!ks.length) return;
+  if(!confirm(`Desmarcar os ${ks.length} serviço(s) já conferidos na obra ${obra}?`)) return;
+  ks.forEach(k=>delete CONFERIDOS[k]);
+  salvarConferidos(); desenharFichaConfronto(); render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
 let INATIVOS=new Set();
 try{const g=localStorage.getItem("confronto-inativos"); if(g) INATIVOS=new Set(JSON.parse(g))}catch(e){}
 const chaveInat=(obra,op,cod)=>obra+"|"+op+"|"+cod;
@@ -763,10 +792,12 @@ function desenharFichaConfronto(){
     const ativos=it.filter(x=>!x.inativo);
     const sv=ativos.reduce((a,x)=>a+Math.abs(x.vdif),0);
     const nInat=it.length-ativos.length;
+    const nConf=it.filter(x=>CONFERIDOS[chaveInat(g.obra,x.op,x.cod)]).length;
     if(!it.length) return "";
     return `<div class="secao ${cls}">
-      <div class="stitulo">${ico} ${titulo} <span class="cont">${ativos.length} serviços · ${ativos.filter(x=>x.op==="I").length} inst. / ${ativos.filter(x=>x.op==="R").length} retir.${nInat?" · "+nInat+" inativo(s)":""}</span><span class="stot">${brl(sv)}</span></div>
+      <div class="stitulo">${ico} ${titulo} <span class="cont">${ativos.length} serviços · ${ativos.filter(x=>x.op==="I").length} inst. / ${ativos.filter(x=>x.op==="R").length} retir.${nInat?" · "+nInat+" inativo(s)":""}${nConf?` · <b>${nConf} conferido(s) na obra</b>`:""}</span><span class="stot">${brl(sv)}</span></div>
       <table class="ftbl"><thead><tr>
+        <th class="cChk" title="Marque o que já foi conferido na obra">✔</th>
         <th data-k="cod">Código${seta("cod")}</th>
         <th>Op.</th>
         <th data-k="serv">Serviço${seta("serv")}</th>
@@ -776,12 +807,15 @@ function desenharFichaConfronto(){
         <th class="num" data-k="vdif">Valor${seta("vdif")}</th>
         <th></th>
       </tr></thead><tbody>
-      ${it.map(x=>`<tr class="${x.inativo?"inativo":""}${x.editado?" editado":""}"><td>${x.cod}${x.editado?'<span class="mkEd" title="Quantidade editada">✎</span>':""}</td><td class="${x.op==="I"?"op-i":"op-r"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td><td>${esc(x.serv)}${marcaLV(x.serv)}</td>
+      ${it.map(x=>{const kc=chaveInat(g.obra,x.op,x.cod), cf=CONFERIDOS[kc];
+        return `<tr class="${x.inativo?"inativo":""}${x.editado?" editado":""}${cf?" jaconf":""}">
+        <td class="cChk"><input type="checkbox" class="chkConf" data-conf="${kc}" ${cf?"checked":""} title="${cf?"Conferido na obra em "+esc(cf.em)+" — clique para desmarcar":"Marcar como já conferido na obra"}"></td>
+        <td>${x.cod}${x.editado?'<span class="mkEd" title="Quantidade editada">✎</span>':""}</td><td class="${x.op==="I"?"op-i":"op-r"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td><td>${esc(x.serv)}${marcaLV(x.serv)}</td>
         <td class="num"><input class="qtd" type="number" min="0" step="any" value="${x.qa}" data-ed="${g.obra}|${x.op}|${x.cod}|qa" title="Quantidade apontada — edite se precisar corrigir"></td>
         <td class="num"><input class="qtd" type="number" min="0" step="any" value="${x.qp}" data-ed="${g.obra}|${x.op}|${x.cod}|qp" title="Quantidade paga — edite se precisar corrigir"></td>
         <td class="num">${nnum(x.dif)}</td><td class="num">${brl(Math.abs(x.vdif))}</td>
-        <td class="acao"><button class="mini ${x.inativo?"reativar":""}" data-inat="${g.obra}|${x.op}|${x.cod}" title="${x.inativo?"Voltar a considerar este serviço":"Tirar este serviço da análise"}">${x.inativo?"Reativar":"Desativar"}</button></td></tr>`).join("")}
-      </tbody><tfoot><tr><th colspan="5">${titulo} — total</th><th class="num"></th><th class="num">${brl(sv)}</th><th></th></tr></tfoot></table></div>`;
+        <td class="acao"><button class="mini ${x.inativo?"reativar":""}" data-inat="${g.obra}|${x.op}|${x.cod}" title="${x.inativo?"Voltar a considerar este serviço":"Tirar este serviço da análise"}">${x.inativo?"Reativar":"Desativar"}</button></td></tr>`}).join("")}
+      </tbody><tfoot><tr><th colspan="6">${titulo} — total</th><th class="num"></th><th class="num">${brl(sv)}</th><th></th></tr></tfoot></table></div>`;
   };
 
   const eqObra=(EQUIPES[num]||{}).equipe;
@@ -807,12 +841,16 @@ function desenharFichaConfronto(){
     ${bloco("Pago sem apontamento","sem","🔵",x=>x.sit==="Pago sem apontamento")}
     ${bloco("Serviços não encontrados no termômetro","nao","⚠️",x=>x.sit==="Obra não encontrada no termômetro")}
     ${bloco("Conferido (apontado = pago)","ok","✅",x=>x.sit==="Conferido")}
-    <div class="ftotal"><span>Pendente de pagamento nesta obra <span class="muted" style="font-size:12px;font-weight:500">· ${conferidos} serviços conferidos${g.inat?" · "+g.inat+" fora da análise":""}${g.itens.filter(x=>x.editado).length?" · "+g.itens.filter(x=>x.editado).length+" com quantidade editada":""}</span></span><b>${brl(g.pend)}</b></div>`;
+    <div class="ftotal"><span>Pendente de pagamento nesta obra <span class="muted" style="font-size:12px;font-weight:500">· ${conferidos} serviços conferidos${g.inat?" · "+g.inat+" fora da análise":""}${g.itens.filter(x=>x.editado).length?" · "+g.itens.filter(x=>x.editado).length+" com quantidade editada":""}${conferidosDaObra(num)?` · <b>✔ ${conferidosDaObra(num)} de ${g.itens.length} já conferidos na obra</b>`:""}</span></span><b>${brl(g.pend)}</b></div>
+    ${conferidosDaObra(num)?`<div style="text-align:right;margin-top:6px"><button class="mini" data-limpaconf="1">Desmarcar os conferidos na obra</button></div>`:""}`;
   document.querySelectorAll("#mbody .ftbl thead").forEach(t=>t.onclick=e=>{
     const k=e.target.closest("th")?.dataset.k; if(!k)return;
     fichaSort={k,d:fichaSort.k===k?-fichaSort.d:1}; desenharFichaConfronto();
   });
   document.getElementById("mbody").onclick=e=>{
+    const c=e.target.closest("input[data-conf]");
+    if(c){ const [obra,op,cod]=c.dataset.conf.split("|"); alternarConferido(obra,op,cod); return }
+    if(e.target.closest("button[data-limpaconf]")){ limparConferidosObra(num); return }
     const b=e.target.closest("button[data-inat]"); if(!b)return;
     const [obra,op,cod]=b.dataset.inat.split("|"); alternarInativo(obra,op,cod);
   };
@@ -1152,7 +1190,7 @@ function gravarAnalise(id,nome,silencioso){
   const base={id,nome,quando:new Date().toISOString(),
     arquivo:(FONTE&&FONTE.nome)||"", aba:(FONTE&&FONTE.aba)||"", datas:(FONTE&&FONTE.datas)||[],
     confronto:CONFRONTO, equipes:EQUIPES, edicoes:EDICOES,
-    inativos:[...INATIVOS], validadas:VALIDADAS, cobrancas:COBRANCAS, resumo:resumoAtual()};
+    inativos:[...INATIVOS], conferidos:CONFERIDOS, validadas:VALIDADAS, cobrancas:COBRANCAS, resumo:resumoAtual()};
   const aviso=t=>{const el=document.getElementById("fonte"); if(el&&!silencioso) el.innerHTML=t};
   let completa=true;
   try{ localStorage.setItem("analise:"+id, JSON.stringify(Object.assign({},base,{aoa:(FONTE&&FONTE.aoa)||null}))); }
@@ -1178,6 +1216,7 @@ function abrirAnalise(id){
   if(a.equipes) EQUIPES=a.equipes;
   EDICOES=a.edicoes||{}; salvarEdicoes();
   INATIVOS=new Set(a.inativos||[]); salvarInativos(); invalidarConfronto(); UNIT=null;
+  CONFERIDOS=a.conferidos||{}; salvarConferidos();
   VALIDADAS=a.validadas||{}; salvarValidadas();
   COBRANCAS=a.cobrancas||{}; salvarCobrancas();
   ANALISE_ATUAL={id:a.id,nome:a.nome};
