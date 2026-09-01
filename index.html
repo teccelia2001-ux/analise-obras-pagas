@@ -1924,7 +1924,9 @@ function relHTML(){
       <tfoot><tr style="background:${t.bg};color:${t.txt}"><th colspan="6">${s.sit} — total</th>
         <th class="r">${brl(s.total)}</th></tr></tfoot></table></div>`;
   };
-  const obra=(o)=>`<div class="robra">
+  /* no relatório de uma obra só, o cabeçalho dela aparece uma única vez, no topo */
+  const soUmaObra = !!relObra;
+  const obra=(o)=>`${soUmaObra?"":`<div class="robra">
       <div class="rnum">Obra ${o.obra}</div>
       <div class="rdesc">${esc(o.desc)}${o.mun?" · "+esc(o.mun):""}</div>
       ${o.equipe?`<div class="rdesc">Equipe: <b>${esc(o.equipe)}</b></div>`:""}
@@ -1933,10 +1935,12 @@ function relHTML(){
           o.pend>0?'<span class="rtag" style="background:#fee2e2;color:#b91c1c;border-color:#dc2626">Pendente de pagamento</span>':
           '<span class="rtag" style="background:#dcfce7;color:#15803d;border-color:#16a34a">Conferida</span>'}
         ${o.inat?`<span class="rtag" style="background:#eef2f7;color:#475569;border-color:#94a3b8">${o.inat} fora da análise</span>`:""}</div>
-    </div>
+    </div>`}
     ${o.secoes.map(secao).join("")}
     <div class="rtotal"><span>Total da obra</span><b>${brl(o.total)}</b></div>`;
+  const o1 = soUmaObra ? d.obras[0] : null;
   return `<div class="rhead"><h1>${c.titulo}</h1>
+      ${o1?`<div class="sub">${esc(o1.desc)}${o1.mun?" · "+esc(o1.mun):""}${o1.equipe?" · Equipe: "+esc(o1.equipe):""}${o1.inat?" · "+o1.inat+" serviço(s) fora da análise":""}</div>`:""}
       <div class="sub">${c.sub}</div>${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
     <div class="rsec" style="border-color:#334155">
       <div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
@@ -1972,7 +1976,12 @@ document.getElementById("relPdf").onclick=()=>{
   const alvo=document.getElementById("relprint");
   alvo.innerHTML=relHTML(); alvo.hidden=false;
   document.body.classList.add("imprimindo");
-  const limpar=()=>{document.body.classList.remove("imprimindo");alvo.hidden=true;window.removeEventListener("afterprint",limpar)};
+  /* o navegador usa o título da página como nome do arquivo — já sai com o número da obra */
+  const tituloOrig=document.title;
+  const dia=new Date().toISOString().slice(0,10).split("-").reverse().join("-");
+  document.title = relObra ? `Obra ${relObra} - confronto ${dia}` : `Confronto apontado x pago - ${dia}`;
+  const limpar=()=>{document.body.classList.remove("imprimindo");alvo.hidden=true;
+    document.title=tituloOrig;window.removeEventListener("afterprint",limpar)};
   window.addEventListener("afterprint",limpar);
   window.print(); setTimeout(limpar,1500);
 };
@@ -1984,7 +1993,12 @@ document.getElementById("relPng").onclick=()=>{
   const c=relCabecalho();
   const W=1560, P=30, L=20, HS=30, HO=44;      /* largura, margem, linha, altura seção, altura obra */
   const el=[];
-  el.push(["tit",c.titulo]); el.push(["sub",c.sub]);
+  el.push(["tit",c.titulo]);
+  if(relObra&&d.obras[0]){
+    const o=d.obras[0];
+    el.push(["sub",`${o.desc}${o.mun?" · "+o.mun:""}${o.equipe?" · Equipe: "+o.equipe:""}${o.inat?" · "+o.inat+" serviço(s) fora da análise":""}`]);
+  }
+  el.push(["sub",c.sub]);
   if(c.filtros) el.push(["sub",c.filtros]);
   el.push(["esp",8]);
   el.push(["sec",{sit:null,rot:"Resumo",cont:`${d.obras.length} obras · ${d.itens} serviços`,total:d.total,tema:{bg:"#eef2f7",txt:"#0f172a",bar:"#334155",ico:""}}]);
@@ -1993,7 +2007,9 @@ document.getElementById("relPng").onclick=()=>{
   el.push(["totres",d]);
   if(d.det){
     d.obras.forEach(o=>{
-      el.push(["esp",14]); el.push(["obra",o]);
+      el.push(["esp",14]);
+      /* relatório de uma obra só: o cabeçalho dela já está no topo, não repete */
+      if(!relObra) el.push(["obra",o]);
       o.secoes.forEach(s=>{
         el.push(["esp",6]);
         el.push(["sec",{sit:s.sit,rot:s.sit,cont:`${s.itens.length} serviços · ${s.inst} inst. / ${s.retir} retir.`,total:s.total,tema:SIT_TEMA[s.sit]}]);
