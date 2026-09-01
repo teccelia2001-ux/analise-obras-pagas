@@ -115,6 +115,8 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 .scroll{max-height:65vh;overflow:auto;border-radius:10px;border:1px solid var(--line)}
 .muted{color:var(--muted)}
 .trunc{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-weight:400}
+#codigomodal[hidden]{display:none}
+#codigomodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:80;overflow:auto}
 #analisesmodal[hidden]{display:none}
 #analisesmodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:70;overflow:auto}
 .itemAnalise{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
@@ -280,6 +282,7 @@ html{-webkit-text-size-adjust:100%}
     <button class="sec" id="btnOrig" hidden>Voltar à planilha original</button>
     <button id="btnTermo">🌡️ Analisar termômetro</button>
     <button class="sec" id="btnSalvar">💾 Salvar análise</button>
+    <button class="sec" id="btnCodigoAtual" title="Salvar e gerar o código de recuperação desta análise">🔑 Código desta análise</button>
     <button class="sec" id="btnAnalises">📂 Minhas análises</button>
     <button class="sec perigo" id="btnLimpar">🗑️ Apagar dados</button>
     <input type="file" id="arq" accept=".xls,.xlsx,.xlsm,.csv" hidden>
@@ -347,6 +350,46 @@ html{-webkit-text-size-adjust:100%}
       <p id="analisesSub" class="muted" style="margin-top:0;font-size:12.5px" hidden>
         Escolha uma análise salva para continuar de onde parou, ou feche esta janela para trabalhar com a medição original.</p>
       <div id="listaAnalises" style="display:flex;flex-direction:column;gap:10px"></div>
+
+      <div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="font-size:13.5px">🔑 Código de recuperação</strong>
+          <span style="flex:1"></span>
+          <button class="sec" id="btnAbrirRestaurar">Restaurar por código…</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:6px 0 0">
+          Gere o código de uma análise, guarde-o num arquivo ou no e-mail e cole aqui depois para recuperar tudo —
+          mesmo em outro computador, após atualizar o site ou limpar o cache.</p>
+        <div id="boxRestaurar" hidden style="margin-top:10px">
+          <textarea id="txtCodigo" spellcheck="false" placeholder="Cole aqui o código da análise (começa com AOP1-)…"
+            style="width:100%;min-height:110px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:11px;
+                   padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:inherit"></textarea>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+            <button id="btnRestaurarCodigo">Restaurar análise</button>
+            <button class="sec" id="btnArquivoCodigo">📄 Abrir arquivo .txt</button>
+            <input type="file" id="fileCodigo" accept=".txt,.aop,text/plain" hidden>
+            <span id="msgCodigo" class="muted" style="font-size:12px"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="codigomodal" hidden>
+  <div class="mbox" style="max-width:720px">
+    <div class="mtop"><strong>🔑 Código da análise</strong><span style="flex:1"></span>
+      <button class="sec" id="codigoFechar">Fechar ✕</button></div>
+    <div style="padding:16px">
+      <p class="muted" style="margin-top:0;font-size:12.5px" id="codigoSub"></p>
+      <textarea id="codigoSaida" readonly spellcheck="false"
+        style="width:100%;min-height:180px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:11px;
+               padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:inherit"></textarea>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        <button id="codigoCopiar">📋 Copiar código</button>
+        <button class="sec" id="codigoBaixar">⬇️ Baixar .txt</button>
+        <span id="codigoMsg" class="muted" style="font-size:12px"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -1187,6 +1230,7 @@ function listarAnalises(){
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button data-abrir="${a.id}">Abrir</button>
+      <button class="sec" data-codigo="${a.id}">🔑 Código</button>
       <button class="sec" data-renomear="${a.id}">Renomear</button>
       <button class="sec perigo" data-excluir="${a.id}">Excluir</button>
     </div></div>`).join("");
@@ -1199,9 +1243,160 @@ document.getElementById("analisesmodal").addEventListener("click",e=>{if(e.targe
 document.getElementById("listaAnalises").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   if(b.dataset.abrir) abrirAnalise(b.dataset.abrir);
+  else if(b.dataset.codigo) mostrarCodigo(b.dataset.codigo);
   else if(b.dataset.renomear) renomearAnalise(b.dataset.renomear);
   else if(b.dataset.excluir) excluirAnalise(b.dataset.excluir);
 });
+
+/* ---------- código de recuperação (exportar/importar análise) ---------- */
+const COD_PREFIXO="AOP1-", COD_PREFIXO_CRU="AOP0-";
+
+function b64Enc(bytes){
+  let s=""; const passo=0x8000;
+  for(let i=0;i<bytes.length;i+=passo) s+=String.fromCharCode.apply(null,bytes.subarray(i,i+passo));
+  return btoa(s);
+}
+function b64Dec(txt){
+  const s=atob(txt), u=new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i);
+  return u;
+}
+async function comprimir(bytes){
+  if(typeof CompressionStream!=="function") return null;
+  const cs=new CompressionStream("deflate-raw");
+  const w=cs.writable.getWriter(); w.write(bytes); w.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+}
+async function descomprimir(bytes){
+  const ds=new DecompressionStream("deflate-raw");
+  const w=ds.writable.getWriter(); w.write(bytes); w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+function quebrar(t){ return (t.match(/.{1,120}/g)||[]).join("\n") }
+
+async function gerarCodigo(id){
+  const cru=localStorage.getItem("analise:"+id);
+  if(!cru) throw new Error("Análise não encontrada.");
+  const bytes=new TextEncoder().encode(cru);
+  let comp=null; try{ comp=await comprimir(bytes) }catch(e){}
+  return comp ? COD_PREFIXO+quebrar(b64Enc(comp)) : COD_PREFIXO_CRU+quebrar(b64Enc(bytes));
+}
+async function lerCodigo(texto){
+  const limpo=(texto||"").replace(/\s+/g,"");
+  let corpo=null, comprimido=false;
+  if(limpo.startsWith(COD_PREFIXO)){ corpo=limpo.slice(COD_PREFIXO.length); comprimido=true }
+  else if(limpo.startsWith(COD_PREFIXO_CRU)){ corpo=limpo.slice(COD_PREFIXO_CRU.length) }
+  else throw new Error("Código inválido — ele precisa começar com AOP1-.");
+  let bytes;
+  try{ bytes=b64Dec(corpo) }catch(e){ throw new Error("Código incompleto ou corrompido — copie o texto inteiro.") }
+  if(comprimido){
+    try{ bytes=await descomprimir(bytes) }
+    catch(e){ throw new Error("Código incompleto ou corrompido — copie o texto inteiro.") }
+  }
+  let a=null;
+  try{ a=JSON.parse(new TextDecoder().decode(bytes)) }catch(e){}
+  if(!a||typeof a!=="object"||!a.nome) throw new Error("Este código não é de uma análise.");
+  return a;
+}
+function salvarAnaliseImportada(a){
+  const l=lerIndice();
+  let id=a.id||("a"+Date.now().toString(36));
+  let nome=a.nome;
+  const existente=l.find(x=>x.id===id);
+  if(existente){
+    if(!confirm(`Já existe a análise “${existente.nome}” com este código.\n\nOK = substituir pela versão do código\nCancelar = importar como uma cópia nova`)){
+      id="a"+Date.now().toString(36); nome=a.nome+" (cópia)";
+    }
+  }
+  a=Object.assign({},a,{id,nome});
+  try{ localStorage.setItem("analise:"+id,JSON.stringify(a)); }
+  catch(e){
+    try{ const semPlan=Object.assign({},a,{aoa:null}); localStorage.setItem("analise:"+id,JSON.stringify(semPlan)); a=semPlan; }
+    catch(e2){ throw new Error("Sem espaço no navegador. Exclua uma análise antiga e tente de novo.") }
+  }
+  gravarIndice([{id,nome,quando:a.quando||new Date().toISOString(),arquivo:a.arquivo||"",
+    completa:!!(a.aoa&&a.aoa.length),resumo:a.resumo||null}].concat(l.filter(x=>x.id!==id)));
+  return id;
+}
+
+let CODIGO_ATUAL={texto:"",nome:""};
+function mostrarCodigo(id){
+  const a=lerIndice().find(x=>x.id===id);
+  const sub=document.getElementById("codigoSub"), saida=document.getElementById("codigoSaida");
+  document.getElementById("codigoMsg").textContent="";
+  saida.value="Gerando código…";
+  document.getElementById("codigomodal").hidden=false;
+  gerarCodigo(id).then(cod=>{
+    CODIGO_ATUAL={texto:cod,nome:(a&&a.nome)||"analise"};
+    saida.value=cod;
+    sub.innerHTML=`Código de <b>${esc((a&&a.nome)||"")}</b> — ${(cod.length/1024).toFixed(0)} KB. `+
+      `Guarde-o num arquivo de texto (ou baixe o .txt). Para recuperar, cole em <b>Minhas análises → Restaurar por código</b>.`+
+      ((a&&!a.completa)?" <b>Atenção:</b> esta análise foi salva sem a planilha completa.":"");
+  }).catch(e=>{ saida.value=""; sub.textContent="❌ "+e.message });
+}
+function fecharCodigo(){document.getElementById("codigomodal").hidden=true}
+document.getElementById("codigoFechar").onclick=fecharCodigo;
+document.getElementById("codigomodal").addEventListener("click",e=>{if(e.target.id==="codigomodal")fecharCodigo()});
+document.getElementById("codigoCopiar").onclick=()=>{
+  const t=document.getElementById("codigoSaida"), msg=document.getElementById("codigoMsg");
+  t.select(); t.setSelectionRange(0,t.value.length);
+  const ok=()=>{msg.textContent="✅ Copiado."; setTimeout(()=>msg.textContent="",3000)};
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(ok,()=>{
+    msg.textContent = document.execCommand("copy") ? "✅ Copiado." : "Selecione o texto e use Ctrl+C.";
+  });
+  else msg.textContent = document.execCommand("copy") ? "✅ Copiado." : "Selecione o texto e use Ctrl+C.";
+};
+document.getElementById("codigoBaixar").onclick=()=>{
+  if(!CODIGO_ATUAL.texto) return;
+  const nome=CODIGO_ATUAL.nome.replace(/[\\/:*?"<>|]+/g,"-").slice(0,60)||"analise";
+  const url=URL.createObjectURL(new Blob([CODIGO_ATUAL.texto],{type:"text/plain;charset=utf-8"}));
+  const a=document.createElement("a"); a.href=url; a.download=`codigo-${nome}.txt`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+/* gera o código da análise aberta agora — salvando antes, para levar as últimas edições */
+document.getElementById("btnCodigoAtual").onclick=()=>{
+  let id;
+  if(ANALISE_ATUAL){
+    id=ANALISE_ATUAL.id;
+    if(!gravarAnalise(id,ANALISE_ATUAL.nome,true)) return;   // sem espaço: gravarAnalise já avisa
+  }else{
+    if(!(CONFRONTO&&CONFRONTO.linhas&&CONFRONTO.linhas.length)&&!D.length){
+      alert("Carregue uma medição (ou abra uma análise salva) antes de gerar o código.");return;
+    }
+    const sugerido=(FONTE&&FONTE.nome? FONTE.nome.replace(/\.(xls|xlsx|xlsm|csv)$/i,"") : "Análise")+" — "+new Date().toLocaleDateString("pt-BR");
+    const nome=prompt("Esta análise ainda não foi salva. Nome dela:",sugerido);
+    if(!nome) return;
+    id="a"+Date.now().toString(36);
+    if(!gravarAnalise(id,nome.trim(),true)) return;
+  }
+  mostrarCodigo(id);
+};
+document.getElementById("btnAbrirRestaurar").onclick=()=>{
+  const b=document.getElementById("boxRestaurar");
+  b.hidden=!b.hidden;
+  if(!b.hidden) document.getElementById("txtCodigo").focus();
+};
+document.getElementById("btnArquivoCodigo").onclick=()=>document.getElementById("fileCodigo").click();
+document.getElementById("fileCodigo").onchange=e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{document.getElementById("txtCodigo").value=r.result;
+    document.getElementById("msgCodigo").textContent="Arquivo lido — clique em “Restaurar análise”."};
+  r.readAsText(f); e.target.value="";
+};
+document.getElementById("btnRestaurarCodigo").onclick=async ()=>{
+  const msg=document.getElementById("msgCodigo"), txt=document.getElementById("txtCodigo").value;
+  if(!txt.trim()){msg.textContent="Cole o código primeiro.";return}
+  msg.textContent="Restaurando…";
+  try{
+    const a=await lerCodigo(txt);
+    const id=salvarAnaliseImportada(a);
+    document.getElementById("txtCodigo").value="";
+    msg.textContent="";
+    atualizarBarraAnalise(); listarAnalises();
+    abrirAnalise(id);
+  }catch(e){ msg.innerHTML='<span style="color:var(--bad)">❌ '+esc(e.message)+"</span>" }
+};
 document.getElementById("btnSalvar").onclick=()=>{
   const sugerido = ANALISE_ATUAL ? ANALISE_ATUAL.nome
     : ((FONTE&&FONTE.nome? FONTE.nome.replace(/\.(xls|xlsx|xlsm|csv)$/i,"") : "Análise")+" — "+new Date().toLocaleDateString("pt-BR"));
