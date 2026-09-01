@@ -98,6 +98,12 @@ td.cChk input{cursor:pointer;width:15px;height:15px;accent-color:var(--ok,#16a34
 tr.jaconf td{background:rgba(22,163,74,.10)}
 tr.jaconf td:first-child{box-shadow:inset 3px 0 0 var(--ok,#16a34a)}
 tr.jaconf.inativo td{background:transparent}
+.mkAdd{color:var(--accent);margin-left:4px;font-size:11px}
+.secao.add>.stitulo{background:var(--panel2);color:var(--muted)}
+.formAdd{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:12px 13px;background:var(--panel)}
+.formAdd label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);font-weight:600;flex:1 1 110px}
+.formAdd input,.formAdd select{padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:inherit;font-size:13px;width:100%}
+td.acao button.mini+button.mini{margin-left:4px}
 button.mini{padding:2px 8px;font-size:11px;border-radius:99px;background:var(--panel2);border-color:var(--line);color:var(--muted);font-weight:600}
 button.mini:hover{background:var(--bad);border-color:var(--bad);color:#fff}
 button.mini.reativar:hover{background:var(--ok);border-color:var(--ok)}
@@ -638,6 +644,77 @@ function editarQtd(obra,op,cod,campo,valor){
   invalidarConfronto(); salvarEdicoes(); desenharFichaConfronto(); render();
 }
 function limparEdicoes(){EDICOES={};salvarEdicoes()}
+/* serviços acrescentados à mão — o que foi feito na obra mas não está no apontamento */
+let ADICIONADOS={}, ADD_ABERTO=false;
+try{const a=localStorage.getItem("confronto-adicionados"); if(a) ADICIONADOS=JSON.parse(a)}catch(e){}
+function salvarAdicionados(){try{localStorage.setItem("confronto-adicionados",JSON.stringify(ADICIONADOS))}catch(e){}}
+const chaveAdd=(obra,op,cod)=>obra+"|"+op+"|"+cod;
+/* catálogo de serviços conhecidos: descrição e valor unitário vindos da medição e do confronto */
+let CATALOGO=null;
+function catalogo(){
+  if(CATALOGO) return CATALOGO;
+  CATALOGO=new Map();
+  for(const l of CONFRONTO.linhas){
+    const k=l[2]+"|"+l[3];
+    if(CATALOGO.has(k)) continue;
+    const u=unitDe(l[2],l[3]) || (l[7]? Math.abs(l[8]/l[7]) : 0);
+    CATALOGO.set(k,{op:l[2],cod:l[3],serv:l[4],unit:Math.round(u*100)/100});
+  }
+  for(const r of D){
+    const k=r.tip_operacao+"|"+r.cod_mobra;
+    if(CATALOGO.has(k)) continue;
+    CATALOGO.set(k,{op:r.tip_operacao,cod:r.cod_mobra,serv:r.des_mobra||"",
+      unit:Math.round((unitDe(r.tip_operacao,r.cod_mobra)||0)*100)/100});
+  }
+  return CATALOGO;
+}
+function invalidarCatalogo(){CATALOGO=null}
+/* linhas dos serviços acrescentados, no mesmo formato das linhas do confronto */
+function linhasAdicionadas(){
+  const out=[];
+  for(const obra of Object.keys(ADICIONADOS))
+    for(const it of ADICIONADOS[obra]){
+      const dif=Math.round((it.qa-it.qp)*100)/100;
+      out.push([obra,it.mun||"",it.op,it.cod,it.serv,it.qa,it.qp,dif,
+        Math.round(dif*(it.unit||0)*100)/100,situacaoDe(it.qa,it.qp,null)]);
+    }
+  return out;
+}
+function ehAdicionado(obra,op,cod){
+  return (ADICIONADOS[obra]||[]).some(i=>i.op===op&&i.cod===cod);
+}
+function adicionarServico(obra,dados){
+  const cod=String(dados.cod||"").trim();
+  if(!cod) return "Informe o código do serviço.";
+  const op=dados.op==="R"?"R":"I";
+  const jaNoConfronto=CONFRONTO.linhas.some(l=>l[0]===obra&&l[2]===op&&l[3]===cod);
+  if(jaNoConfronto) return "Este serviço já está na ficha desta obra — edite a quantidade nele.";
+  if(ehAdicionado(obra,op,cod)) return "Este serviço já foi acrescentado nesta obra.";
+  const num=v=>{const n=parseFloat(String(v).replace(",",".")); return isNaN(n)||n<0?0:Math.round(n*100)/100};
+  const qa=num(dados.qa), qp=num(dados.qp), unit=num(dados.unit);
+  if(!qa&&!qp) return "Informe a quantidade apontada ou a paga.";
+  const cat=catalogo().get(op+"|"+cod);
+  const serv=String(dados.serv||"").trim()||(cat?cat.serv:"")||("Serviço "+cod);
+  const g=confrontoPorObra().find(x=>x.obra===obra);
+  (ADICIONADOS[obra]||(ADICIONADOS[obra]=[])).push({op,cod,serv,qa,qp,unit:unit||(cat?cat.unit:0),mun:g?g.mun:""});
+  ADD_ABERTO=false;
+  salvarAdicionados(); invalidarConfronto(); invalidarCatalogo();
+  desenharFichaConfronto(); render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+  return "";
+}
+function removerServicoAdicionado(obra,op,cod){
+  const l=ADICIONADOS[obra]||[], i=l.findIndex(x=>x.op===op&&x.cod===cod);
+  if(i<0) return;
+  if(!confirm(`Excluir o serviço acrescentado ${cod} — ${l[i].serv}?`)) return;
+  l.splice(i,1); if(!l.length) delete ADICIONADOS[obra];
+  const k=chaveAdd(obra,op,cod);
+  delete EDICOES[k]; salvarEdicoes();
+  delete CONFERIDOS[k]; salvarConferidos();
+  INATIVOS.delete(k); salvarInativos();
+  salvarAdicionados(); invalidarConfronto(); desenharFichaConfronto(); render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
 /* itens já conferidos em campo — só marcação visual, não mexe em nenhum total */
 let CONFERIDOS={};
 try{const c=localStorage.getItem("confronto-conferidos"); if(c) CONFERIDOS=JSON.parse(c)}catch(e){}
@@ -694,9 +771,10 @@ function obrasSuspeitas(){
 function confrontoPorObra(){
   if(CONF_CACHE) return CONF_CACHE;
   const m=new Map();
-  for(const r of CONFRONTO.linhas){
+  for(const r of CONFRONTO.linhas.concat(linhasAdicionadas())){
     /* itens inativos não somam nos totais */
     let [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
+    const acrescentado=ehAdicionado(obra,op,cod);
     if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,conf:0,inat:0,naoenc:false,itens:[]});
     const g=m.get(obra);
     const inativo=INATIVOS.has(chaveInat(obra,op,cod));
@@ -712,7 +790,7 @@ function confrontoPorObra(){
         sit=situacaoDe(qa,qp,sit);
       }
     }
-    g.itens.push({op,cod,serv,qa,qp,dif,vdif,sit,inativo,editado});
+    g.itens.push({op,cod,serv,qa,qp,dif,vdif,sit,inativo,editado,acrescentado});
     if(inativo){g.inat=(g.inat||0)+1; continue}
     if(sit==="Obra não encontrada no termômetro") g.naoenc=true;
     if(sit==="Pendente de pagamento"||sit==="Pagamento parcial"){g.pend+=vdif;g.div++}
@@ -810,11 +888,11 @@ function desenharFichaConfronto(){
       ${it.map(x=>{const kc=chaveInat(g.obra,x.op,x.cod), cf=CONFERIDOS[kc];
         return `<tr class="${x.inativo?"inativo":""}${x.editado?" editado":""}${cf?" jaconf":""}">
         <td class="cChk"><input type="checkbox" class="chkConf" data-conf="${kc}" ${cf?"checked":""} title="${cf?"Conferido na obra em "+esc(cf.em)+" — clique para desmarcar":"Marcar como já conferido na obra"}"></td>
-        <td>${x.cod}${x.editado?'<span class="mkEd" title="Quantidade editada">✎</span>':""}</td><td class="${x.op==="I"?"op-i":"op-r"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td><td>${esc(x.serv)}${marcaLV(x.serv)}</td>
+        <td>${x.cod}${x.editado?'<span class="mkEd" title="Quantidade editada">✎</span>':""}${x.acrescentado?'<span class="mkAdd" title="Serviço acrescentado à mão — não veio do apontamento">➕</span>':""}</td><td class="${x.op==="I"?"op-i":"op-r"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td><td>${esc(x.serv)}${marcaLV(x.serv)}</td>
         <td class="num"><input class="qtd" type="number" min="0" step="any" value="${x.qa}" data-ed="${g.obra}|${x.op}|${x.cod}|qa" title="Quantidade apontada — edite se precisar corrigir"></td>
         <td class="num"><input class="qtd" type="number" min="0" step="any" value="${x.qp}" data-ed="${g.obra}|${x.op}|${x.cod}|qp" title="Quantidade paga — edite se precisar corrigir"></td>
         <td class="num">${nnum(x.dif)}</td><td class="num">${brl(Math.abs(x.vdif))}</td>
-        <td class="acao"><button class="mini ${x.inativo?"reativar":""}" data-inat="${g.obra}|${x.op}|${x.cod}" title="${x.inativo?"Voltar a considerar este serviço":"Tirar este serviço da análise"}">${x.inativo?"Reativar":"Desativar"}</button></td></tr>`}).join("")}
+        <td class="acao"><button class="mini ${x.inativo?"reativar":""}" data-inat="${g.obra}|${x.op}|${x.cod}" title="${x.inativo?"Voltar a considerar este serviço":"Tirar este serviço da análise"}">${x.inativo?"Reativar":"Desativar"}</button>${x.acrescentado?`<button class="mini perigo" data-rmadd="${g.obra}|${x.op}|${x.cod}" title="Excluir este serviço acrescentado">Excluir</button>`:""}</td></tr>`}).join("")}
       </tbody><tfoot><tr><th colspan="6">${titulo} — total</th><th class="num"></th><th class="num">${brl(sv)}</th><th></th></tr></tfoot></table></div>`;
   };
 
@@ -835,6 +913,23 @@ function desenharFichaConfronto(){
       <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}</div>
     </div></div>
     ${naoenc}
+    <div class="secao add">
+      <div class="stitulo">➕ Serviço fora do apontamento
+        <span class="cont">executado na obra e não lançado no termômetro</span>
+        <span class="stot"><button class="mini" data-addserv="1">${ADD_ABERTO?"Cancelar":"Acrescentar serviço"}</button></span></div>
+      ${ADD_ABERTO?`<div class="formAdd">
+        <label>Operação<select id="addOp"><option value="I">▲ Instalado</option><option value="R">▼ Retirado</option></select></label>
+        <label>Código<input id="addCod" list="listaServ" placeholder="ex.: 62261" autocomplete="off"></label>
+        <label style="flex:2 1 260px">Serviço<input id="addServ" placeholder="preenche sozinho pelo código"></label>
+        <label>Apontado<input id="addQa" type="number" min="0" step="any" value="1"></label>
+        <label>Pago<input id="addQp" type="number" min="0" step="any" value="0"></label>
+        <label>Valor unitário<input id="addUnit" type="number" min="0" step="any" placeholder="R$"></label>
+        <button data-addok="1">Acrescentar</button>
+        <span id="addMsg" class="muted" style="font-size:12px"></span>
+        <datalist id="listaServ">${[...catalogo().values()].map(c=>`<option value="${esc(c.cod)}">${esc(c.serv)}</option>`).join("")}</datalist>
+        <p class="muted" style="flex:1 1 100%;margin:2px 0 0;font-size:12px">O serviço entra na ficha como qualquer outro — soma na pendência da obra, aparece no relatório e vai junto no código de recuperação.</p>
+      </div>`:""}
+    </div>
     ${bloco("Pendente de pagamento","pend","🔴",x=>x.sit==="Pendente de pagamento")}
     ${bloco("Pagamento parcial","parc","🟠",x=>x.sit==="Pagamento parcial")}
     ${bloco("Pago a mais","mais","🟣",x=>x.sit==="Pago a mais")}
@@ -851,11 +946,31 @@ function desenharFichaConfronto(){
     const c=e.target.closest("input[data-conf]");
     if(c){ const [obra,op,cod]=c.dataset.conf.split("|"); alternarConferido(obra,op,cod); return }
     if(e.target.closest("button[data-limpaconf]")){ limparConferidosObra(num); return }
+    if(e.target.closest("button[data-addserv]")){ ADD_ABERTO=!ADD_ABERTO; desenharFichaConfronto(); return }
+    if(e.target.closest("button[data-addok]")){
+      const val=id=>{const el=document.getElementById(id); return el?el.value:""};
+      const erro=adicionarServico(num,{op:val("addOp"),cod:val("addCod"),serv:val("addServ"),
+        qa:val("addQa"),qp:val("addQp"),unit:val("addUnit")});
+      const m=document.getElementById("addMsg");
+      if(erro&&m) m.innerHTML='<span style="color:var(--bad)">'+esc(erro)+"</span>";
+      return;
+    }
+    const rm=e.target.closest("button[data-rmadd]");
+    if(rm){ const [obra,op,cod]=rm.dataset.rmadd.split("|"); removerServicoAdicionado(obra,op,cod); return }
     const b=e.target.closest("button[data-inat]"); if(!b)return;
     const [obra,op,cod]=b.dataset.inat.split("|"); alternarInativo(obra,op,cod);
   };
   /* atribuição (e não addEventListener) para não acumular ouvintes a cada redesenho */
+  document.getElementById("mbody").oninput=e=>{
+    if(e.target.id!=="addCod"&&e.target.id!=="addOp") return;
+    const op=(document.getElementById("addOp")||{}).value||"I";
+    const c=catalogo().get(op+"|"+String((document.getElementById("addCod")||{}).value||"").trim());
+    const s=document.getElementById("addServ"), u=document.getElementById("addUnit");
+    if(c){ if(s&&!s.dataset.tocado) s.value=c.serv; if(u&&!u.dataset.tocado) u.value=c.unit||"" }
+  };
+  ["addServ","addUnit"].forEach(id=>{const el=document.getElementById(id); if(el) el.oninput=()=>el.dataset.tocado="1"});
   document.getElementById("mbody").onchange=e=>{
+    if(e.target.id==="addOp"){ const ev=new Event("input",{bubbles:true}); document.getElementById("addCod")?.dispatchEvent(ev); return }
     const i=e.target.closest("input[data-ed]"); if(!i)return;
     const [obra,op,cod,campo]=i.dataset.ed.split("|");
     editarQtd(obra,op,cod,campo,i.value);
@@ -1190,7 +1305,7 @@ function gravarAnalise(id,nome,silencioso){
   const base={id,nome,quando:new Date().toISOString(),
     arquivo:(FONTE&&FONTE.nome)||"", aba:(FONTE&&FONTE.aba)||"", datas:(FONTE&&FONTE.datas)||[],
     confronto:CONFRONTO, equipes:EQUIPES, edicoes:EDICOES,
-    inativos:[...INATIVOS], conferidos:CONFERIDOS, validadas:VALIDADAS, cobrancas:COBRANCAS, resumo:resumoAtual()};
+    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, resumo:resumoAtual()};
   const aviso=t=>{const el=document.getElementById("fonte"); if(el&&!silencioso) el.innerHTML=t};
   let completa=true;
   try{ localStorage.setItem("analise:"+id, JSON.stringify(Object.assign({},base,{aoa:(FONTE&&FONTE.aoa)||null}))); }
@@ -1202,7 +1317,7 @@ function gravarAnalise(id,nome,silencioso){
   const l=lerIndice().filter(x=>x.id!==id);
   l.unshift({id,nome,quando:base.quando,arquivo:base.arquivo,completa,resumo:base.resumo});
   gravarIndice(l);
-  ANALISE_ATUAL={id,nome};
+  ANALISE_ATUAL={id,nome}; salvarRascunho();
   aviso(`💾 <b>${esc(nome)}</b> salva em ${new Date(base.quando).toLocaleString("pt-BR")}${completa?"":" (sem a planilha completa — grande demais para o navegador)"}.`);
   atualizarBarraAnalise();
   return true;
@@ -1217,9 +1332,10 @@ function abrirAnalise(id){
   EDICOES=a.edicoes||{}; salvarEdicoes();
   INATIVOS=new Set(a.inativos||[]); salvarInativos(); invalidarConfronto(); UNIT=null;
   CONFERIDOS=a.conferidos||{}; salvarConferidos();
+  ADICIONADOS=a.adicionados||{}; salvarAdicionados(); invalidarCatalogo();
   VALIDADAS=a.validadas||{}; salvarValidadas();
   COBRANCAS=a.cobrancas||{}; salvarCobrancas();
-  ANALISE_ATUAL={id:a.id,nome:a.nome};
+  ANALISE_ATUAL={id:a.id,nome:a.nome}; invalidarCatalogo(); salvarRascunho();
   const el=document.getElementById("fonte");
   if(el) el.innerHTML=`📂 <b>${esc(a.nome)}</b> — salva em ${new Date(a.quando).toLocaleString("pt-BR")}`+
     (a.aoa? ` · ${esc(a.arquivo||"planilha")}`:" · só o confronto (recarregue a planilha para as demais abas)");
@@ -1241,7 +1357,7 @@ function excluirAnalise(id){
   if(!confirm(`Excluir a análise “${a.nome}”? Isso não afeta as planilhas nem o termômetro.`)) return;
   try{localStorage.removeItem("analise:"+id)}catch(e){}
   gravarIndice(l.filter(x=>x.id!==id));
-  if(ANALISE_ATUAL&&ANALISE_ATUAL.id===id) ANALISE_ATUAL=null;
+  if(ANALISE_ATUAL&&ANALISE_ATUAL.id===id) ANALISE_ATUAL=null; salvarRascunho();
   atualizarBarraAnalise(); listarAnalises();
 }
 function renomearAnalise(id){
@@ -1445,8 +1561,33 @@ document.getElementById("btnSalvar").onclick=()=>{
   gravarAnalise(id,nome.trim(),false);
 };
 /* ao abrir o link, oferecer a escolha quando houver análises salvas */
+/* rascunho automático: guarda o confronto em uso para a página voltar igual depois de recarregar */
+const RASC="confronto-rascunho";
+function salvarRascunho(){
+  try{ localStorage.setItem(RASC,JSON.stringify({confronto:CONFRONTO,equipes:EQUIPES,
+    analise:ANALISE_ATUAL,quando:Date.now()})) }catch(e){}
+}
+function restaurarRascunho(){
+  let r=null;
+  try{ r=JSON.parse(localStorage.getItem(RASC)||"null") }catch(e){}
+  if(!r||!r.confronto||!r.confronto.linhas) return false;
+  CONFRONTO=r.confronto;
+  if(r.equipes) EQUIPES=r.equipes;
+  if(r.analise) ANALISE_ATUAL=r.analise;
+  invalidarConfronto(); invalidarCatalogo(); UNIT=null;
+  return true;
+}
 function ofertaInicial(){
-  const l=lerIndice(); atualizarBarraAnalise();
+  const l=lerIndice();
+  /* continua exatamente de onde parou: nada de perguntar de novo qual análise abrir */
+  if(restaurarRascunho()){
+    atualizarBarraAnalise();
+    const el=document.getElementById("fonte");
+    if(el&&ANALISE_ATUAL) el.innerHTML=`📂 <b>${esc(ANALISE_ATUAL.nome)}</b> — continuando de onde você parou (validações, edições e marcações preservadas).`;
+    render();
+    return;
+  }
+  atualizarBarraAnalise();
   if(!l.length) return;
   const el=document.getElementById("listaAnalises");
   document.getElementById("analisesTitulo").textContent="Escolha a análise para trabalhar";
@@ -1500,8 +1641,8 @@ function calcularConfronto(apont){
   }
   linhas.sort((a,b)=> a[0]===b[0] ? String(a[4]).localeCompare(String(b[4]),"pt-BR") : a[0].localeCompare(b[0]));
   CONFRONTO={linhas,naoencontradas:[...semApont].sort()};
-  EQUIPES=equipes;
-  INATIVOS.clear(); salvarInativos(); invalidarConfronto(); UNIT=null;
+  EQUIPES=equipes; salvarRascunho();
+  INATIVOS.clear(); salvarInativos(); invalidarConfronto(); invalidarCatalogo(); UNIT=null;
   return {linhas:linhas.length,obras:new Set(linhas.map(l=>l[0])).size,semApont:semApont.size};
 }
 
