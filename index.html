@@ -1978,8 +1978,7 @@ document.getElementById("relPdf").onclick=()=>{
   document.body.classList.add("imprimindo");
   /* o navegador usa o título da página como nome do arquivo — já sai com o número da obra */
   const tituloOrig=document.title;
-  const dia=new Date().toISOString().slice(0,10).split("-").reverse().join("-");
-  document.title = relObra ? `Obra ${relObra} - ${dia}` : `Todas as obras - ${dia}`;
+  document.title = relObra ? `Obra ${relObra}` : "Todas as obras";
   const limpar=()=>{document.body.classList.remove("imprimindo");alvo.hidden=true;
     document.title=tituloOrig;window.removeEventListener("afterprint",limpar)};
   window.addEventListener("afterprint",limpar);
