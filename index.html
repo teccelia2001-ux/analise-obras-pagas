@@ -266,6 +266,8 @@ html{-webkit-text-size-adjust:100%}
   #relprint .rtotal b{color:#0284c7;font-size:15px}
   /* resumo sozinho na primeira folha (relatório de todas as obras) */
   #relprint .rquebra{break-after:page;page-break-after:always}
+  /* uma obra por folha (a primeira já começa na folha depois do resumo) */
+  #relprint .robl+.robl{break-before:page;page-break-before:always}
 
   body{background:#fff;color:#000}
   header,.wrap{display:none}
@@ -1928,7 +1930,8 @@ function relHTML(){
   };
   /* no relatório de uma obra só, o cabeçalho dela aparece uma única vez, no topo */
   const soUmaObra = !!relObra;
-  const obra=(o)=>`${soUmaObra?"":`<div class="robra">
+  const obra=(o)=>`${soUmaObra?"":`<div class="robl">
+    <div class="robra">
       <div class="rnum">Obra ${o.obra}</div>
       <div class="rdesc">${esc(o.desc)}${o.mun?" · "+esc(o.mun):""}</div>
       ${o.equipe?`<div class="rdesc">Equipe: <b>${esc(o.equipe)}</b></div>`:""}
@@ -1939,7 +1942,8 @@ function relHTML(){
         ${o.inat?`<span class="rtag" style="background:#eef2f7;color:#475569;border-color:#94a3b8">${o.inat} fora da análise</span>`:""}</div>
     </div>`}
     ${o.secoes.map(secao).join("")}
-    <div class="rtotal"><span>Total da obra</span><b>${brl(o.total)}</b></div>`;
+    <div class="rtotal"><span>Total da obra</span><b>${brl(o.total)}</b></div>
+    ${soUmaObra?"":"</div>"}`;
   const o1 = soUmaObra ? d.obras[0] : null;
   return `<div class="rhead"><h1>${c.titulo}</h1>
       ${o1?`<div class="sub">${esc(o1.desc)}${o1.mun?" · "+esc(o1.mun):""}${o1.equipe?" · Equipe: "+esc(o1.equipe):""}${o1.inat?" · "+o1.inat+" serviço(s) fora da análise":""}</div>`:""}
