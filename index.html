@@ -264,6 +264,8 @@ html{-webkit-text-size-adjust:100%}
   #relprint .rtotal{display:flex;justify-content:space-between;align-items:center;border:2px solid #0284c7;
     border-radius:8px;padding:6px 10px;margin-top:8px;font-weight:700;font-size:12px;break-inside:avoid}
   #relprint .rtotal b{color:#0284c7;font-size:15px}
+  /* resumo sozinho na primeira folha (relatório de todas as obras) */
+  #relprint .rquebra{break-after:page;page-break-after:always}
 
   body{background:#fff;color:#000}
   header,.wrap{display:none}
@@ -1942,7 +1944,7 @@ function relHTML(){
   return `<div class="rhead"><h1>${c.titulo}</h1>
       ${o1?`<div class="sub">${esc(o1.desc)}${o1.mun?" · "+esc(o1.mun):""}${o1.equipe?" · Equipe: "+esc(o1.equipe):""}${o1.inat?" · "+o1.inat+" serviço(s) fora da análise":""}</div>`:""}
       <div class="sub">${c.sub}</div>${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
-    <div class="rsec" style="border-color:#334155">
+    <div class="rsec${soUmaObra?"":" rquebra"}" style="border-color:#334155">
       <div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
         <span>Resumo</span><span class="rcont">${d.obras.length} obras · ${d.itens} serviços</span>
         <span class="rtot">${brl(d.total)}</span></div>
