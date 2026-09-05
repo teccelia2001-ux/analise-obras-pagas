@@ -301,7 +301,7 @@ html{-webkit-text-size-adjust:100%}
     <button class="sec" id="btnOrig" hidden>Voltar à planilha original</button>
     <button id="btnTermo">🌡️ Analisar termômetro</button>
     <button id="btnSS">🔢 Analisar SS</button>
-    <button class="sec" id="btnSalvar">💾 Salvar análise</button>
+    <button class="sec" id="btnSalvar" title="Atualizar a análise aberta ou guardar mais uma">💾 Salvar análise</button>
     <button class="sec" id="btnCodigoAtual" title="Salvar e gerar o código de recuperação desta análise">🔑 Código desta análise</button>
     <button class="sec" id="btnAnalises">📂 Minhas análises</button>
     <button class="sec perigo" id="btnLimpar">🗑️ Apagar dados</button>
@@ -1338,6 +1338,18 @@ function lerArquivo(file){
         }
       }
       processarPlanilha(aoa,file.name,{datas:datas,aba:nomeAba});
+      /* com uma análise aberta, tudo o que vier depois seria gravado por cima dela — pergunta antes */
+      if(ANALISE_ATUAL){
+        const continuar=confirm(
+          "Voc\u00ea abriu outra planilha e a an\u00e1lise \u201c"+ANALISE_ATUAL.nome+"\u201d est\u00e1 aberta.\n\n"+
+          "OK = continuar nessa an\u00e1lise (o conte\u00fado dela passa a ser o desta planilha).\n"+
+          "Cancelar = come\u00e7ar uma an\u00e1lise nova, deixando \u201c"+ANALISE_ATUAL.nome+"\u201d guardada do jeito que est\u00e1.");
+        /* a an\u00e1lise anterior j\u00e1 est\u00e1 gravada; aqui s\u00f3 se solta dela, sem regravar
+           \u2014 regravar agora escreveria a planilha nova dentro da an\u00e1lise antiga */
+        if(!continuar){ ANALISE_ATUAL=null; salvarRascunho(); atualizarBarraAnalise() }
+      }
+      if(!ANALISE_ATUAL && lerIndice().length)
+        fonteEl.innerHTML+=' \u00b7 <b>an\u00e1lise nova</b> \u2014 ao clicar em “💾 Salvar an\u00e1lise\u201d ela entra como mais uma, sem mexer nas anteriores.';
     }catch(err){
       fonteEl.innerHTML=`<span style="color:var(--bad)">❌ ${esc(err.message)}</span>`;
     }
@@ -1519,10 +1531,18 @@ function listarAnalises(){
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button data-abrir="${a.id}">Abrir</button>
+      ${ANALISE_ATUAL&&ANALISE_ATUAL.id===a.id?'<button class="sec" data-fechar="1" title="Sair desta an\u00e1lise: o que voc\u00ea fizer depois deixa de ser gravado nela">Fechar</button>':""}
       <button class="sec" data-codigo="${a.id}">🔑 Código</button>
       <button class="sec" data-renomear="${a.id}">Renomear</button>
       <button class="sec perigo" data-excluir="${a.id}">Excluir</button>
     </div></div>`).join("");
+}
+function fecharAnaliseAberta(){
+  if(!ANALISE_ATUAL) return;
+  gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+  ANALISE_ATUAL=null; salvarRascunho(); atualizarBarraAnalise(); listarAnalises();
+  const el=document.getElementById("fonte");
+  if(el) el.innerHTML="📂 An\u00e1lise fechada e guardada. O que voc\u00ea fizer agora entra numa an\u00e1lise nova ao salvar.";
 }
 function abrirAnalises(){document.getElementById("analisesmodal").hidden=false;listarAnalises()}
 function fecharAnalises(){document.getElementById("analisesmodal").hidden=true}
@@ -1531,7 +1551,8 @@ document.getElementById("analisesFechar").onclick=fecharAnalises;
 document.getElementById("analisesmodal").addEventListener("click",e=>{if(e.target.id==="analisesmodal")fecharAnalises()});
 document.getElementById("listaAnalises").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
-  if(b.dataset.abrir) abrirAnalise(b.dataset.abrir);
+  if(b.dataset.fechar) fecharAnaliseAberta();
+  else if(b.dataset.abrir) abrirAnalise(b.dataset.abrir);
   else if(b.dataset.codigo) mostrarCodigo(b.dataset.codigo);
   else if(b.dataset.renomear) renomearAnalise(b.dataset.renomear);
   else if(b.dataset.excluir) excluirAnalise(b.dataset.excluir);
@@ -1687,12 +1708,19 @@ document.getElementById("btnRestaurarCodigo").onclick=async ()=>{
   }catch(e){ msg.innerHTML='<span style="color:var(--bad)">❌ '+esc(e.message)+"</span>" }
 };
 document.getElementById("btnSalvar").onclick=()=>{
-  const sugerido = ANALISE_ATUAL ? ANALISE_ATUAL.nome
-    : ((FONTE&&FONTE.nome? FONTE.nome.replace(/\.(xls|xlsx|xlsm|csv)$/i,"") : "Análise")+" — "+new Date().toLocaleDateString("pt-BR"));
-  const nome=prompt("Nome desta análise (ex.: Medição 11.08 — novo contrato):",sugerido);
-  if(!nome) return;
-  const id = (ANALISE_ATUAL && ANALISE_ATUAL.nome===nome.trim()) ? ANALISE_ATUAL.id : "a"+Date.now().toString(36);
-  gravarAnalise(id,nome.trim(),false);
+  /* com uma análise aberta, deixa escolher entre atualizar ela ou guardar mais uma */
+  if(ANALISE_ATUAL){
+    const atualizar=confirm(
+      "An\u00e1lise aberta: \u201c"+ANALISE_ATUAL.nome+"\u201d.\n\n"+
+      "OK = atualizar essa an\u00e1lise.\n"+
+      "Cancelar = salvar como uma an\u00e1lise nova, mantendo \u201c"+ANALISE_ATUAL.nome+"\u201d como est\u00e1.");
+    if(atualizar){ gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,false); return }
+  }
+  const sugerido=(FONTE&&FONTE.nome? FONTE.nome.replace(/\.(xls|xlsx|xlsm|csv)$/i,"") : "Análise")+
+    " — "+new Date().toLocaleDateString("pt-BR");
+  const nome=prompt("Nome da nova análise (ex.: Medição 11.08 — novo contrato):",sugerido);
+  if(!nome||!nome.trim()) return;
+  gravarAnalise("a"+Date.now().toString(36),nome.trim(),false);
 };
 /* ao abrir o link, oferecer a escolha quando houver análises salvas */
 /* rascunho automático: guarda o confronto em uso para a página voltar igual depois de recarregar */
