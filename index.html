@@ -2013,10 +2013,20 @@ document.getElementById("termoAplicar").onclick=()=>{
 function listaResumo(){
   const el=document.getElementById("listaInfo"); if(!el) return;
   if(!LISTA){ el.innerHTML=""; return }
-  const nO=(LISTA.obras||[]).filter(o=>!temSS(o)).length;
-  const nS=(LISTA.ss||[]).length+(LISTA.obras||[]).filter(temSS).length;
-  el.innerHTML=`📋 Pesquisando pela lista <b>${esc(LISTA.nome||"carregada")}</b>: `+
-    `${nnum(nO)} obra(s) e ${nnum(nS)} SS — a medição entra só como o que foi <b>pago</b>. `+
+  const porSS=(LISTA.obras||[]).filter(temSS), porNum=(LISTA.obras||[]).filter(o=>!temSS(o));
+  const soltas=LISTA.ss||[];
+  const total=porSS.length+porNum.length+soltas.length;
+  /* um exemplo do que foi lido, para conferir de relance que a planilha entrou certa */
+  const ex = porSS.length? `${porSS[0]} → SS ${ssDaObra(porSS[0])}`
+           : porNum.length? porNum[0]
+           : soltas.length? `SS ${soltas[0]}` : "";
+  const partes=[];
+  if(porSS.length) partes.push(`<b>${nnum(porSS.length)}</b> pesquisada(s) pela <b>SS</b>`);
+  if(porNum.length) partes.push(`<b>${nnum(porNum.length)}</b> pelo próprio número`);
+  if(soltas.length) partes.push(`<b>${nnum(soltas.length)}</b> SS sem obra na tabela obra × SS`);
+  el.innerHTML=`📋 Lista <b>${esc(LISTA.nome||"carregada")}</b>: `+
+    `<b>${nnum(total)}</b> obra(s) reconhecida(s) — ${partes.join(" · ")}`+
+    (ex?` · ex.: ${esc(ex)}`:"")+`. A medição entra só como o que foi <b>pago</b>. `+
     `<a href="#" id="listaLimpar" style="color:var(--accent)">voltar a usar a medição</a>`;
   const a=document.getElementById("listaLimpar");
   if(a) a.onclick=ev=>{ ev.preventDefault(); LISTA=null; salvarLista();
