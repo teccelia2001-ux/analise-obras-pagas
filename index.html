@@ -1418,7 +1418,9 @@ document.getElementById("csv").onclick=()=>{
       .concat([{rot:"Município",chave:"mun",larg:28,tipo:"texto",al:"e"},
                {rot:"Data de execução (termômetro)",chave:"data",larg:22,tipo:"data",al:"c"}]);
     const linhas=G.map(g=>({obra:g.obra, ss:ssDaObra(g.obra)||g.ss||"", mun:g.mun||"", data:dataExec(g.obra)}))
-      .sort((a,b)=>String(a.obra).localeCompare(String(b.obra),"pt-BR"));
+      /* ordem alfabética do município; obras da mesma cidade saem em sequência */
+      .sort((a,b)=>String(a.mun).localeCompare(String(b.mun),"pt-BR",{sensitivity:"base"})
+                || String(a.obra).localeCompare(String(b.obra),"pt-BR"));
     baixarPlanilha(colunas,linhas, eSS?"confronto-ss":"confronto-obras", eSS?"Confronto por SS":"Confronto de obras");
     return;
   }
