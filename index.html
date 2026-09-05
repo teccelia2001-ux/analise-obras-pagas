@@ -1255,14 +1255,35 @@ document.getElementById("xlsx").onclick=()=>{
   const obras=new Set(linhas.map(r=>r.num_obra)).size;
   XLSX.writeFile(wb,`medicao-filtrada-${obras}obras-${linhas.length}linhas.xlsx`);
 };
+function baixarCSV(linhas,nome){
+  const blob=new Blob(["﻿"+linhas.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nome+".csv"; a.click();
+}
+/* ="0202600952" é o único jeito de o Excel abrir sem comer os zeros à esquerda */
+const csvTexto=v=>`="${String(v==null?"":v).replace(/"/g,'""')}"`;
+/* municipio e data nao tem zero a perder: texto normal, para o Excel ler a data como data */
+const csvSimples=v=>`"${String(v==null?"":v).replace(/"/g,'""')}"`;
+/* do termômetro vem "24/07/2026, 09:46:00" — a data de execução é a parte antes da vírgula */
+const dataExec=obra=>String((EQ()[obra]||{}).data||"").split(",")[0].trim();
+
 document.getElementById("csv").onclick=()=>{
+  /* nas abas de confronto a planilha sai enxuta: obra, SS, município e data de execução */
+  if(vista==="conf"||vista==="ss"){
+    const eSS=vista==="ss", G=(window._exp&&window._exp.dados)||[];
+    const cab=["Nº da obra"].concat(eSS?["SS"]:[]).concat(["Município","Data de execução (termômetro)"]);
+    const linhas=[cab.join(";")].concat(G.map(g=>
+      [csvTexto(g.obra)].concat(eSS?[csvTexto(ssDaObra(g.obra)||g.ss||"")]:[])
+        .concat([csvSimples(g.mun),csvSimples(dataExec(g.obra))]).join(";")));
+    baixarCSV(linhas, eSS?"confronto-ss":"confronto-obras");
+    return;
+  }
   const {head,dados}=window._exp;
   const linhas=[head.map(h=>h[1]).join(";")].concat(dados.map(r=>head.map(([k])=>{
     let v=r[k]; if(k==="sit") v=[...r.sits].join("/");
-    return typeof v==="number"? String(v).replace(".",",") : `"${String(v??"").replace(/"/g,'""')}"`;
+    if(k==="num_obra"||k==="cod_mobra") return csvTexto(v);
+    return typeof v==="number"? String(v).replace(".",",") : `"${String(v==null?"":v).replace(/"/g,'""')}"`;
   }).join(";")));
-  const blob=new Blob(["﻿"+linhas.join("\r\n")],{type:"text/csv;charset=utf-8"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="detalhamento-obras.csv"; a.click();
+  baixarCSV(linhas,"detalhamento-obras");
 };
 /* ---------- carregar nova planilha de medição ---------- */
 const SEP=String.fromCharCode(13,10);
