@@ -134,9 +134,9 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 .itemAnalise{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .itemAnalise.atual{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 @media (max-width:700px){.itemAnalise{flex-direction:column;align-items:stretch}.itemAnalise button{width:100%}}
-#termomodal[hidden]{display:none}
-#termomodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:60;overflow:auto}
-#termomodal ol li{margin-bottom:8px}
+#termomodal[hidden],#ssmodal[hidden]{display:none}
+#termomodal,#ssmodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:60;overflow:auto}
+#termomodal ol li,#ssmodal ol li{margin-bottom:8px}
 #relmodal[hidden]{display:none}
 #relmodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:60;overflow:auto}
 #relOpcoes{display:flex;flex-direction:column;gap:7px}
@@ -213,7 +213,7 @@ html{-webkit-text-size-adjust:100%}
   th,td{padding:6px 8px;font-size:12px}
   .trunc{max-width:150px}
   .tag{font-size:10px;padding:1px 6px}
-  #modal,#relmodal,#termomodal{padding:0;align-items:stretch}
+  #modal,#relmodal,#termomodal,#ssmodal{padding:0;align-items:stretch}
   .mbox{border-radius:0;width:100%;min-height:100vh;max-width:100%}
   .mtop{flex-wrap:wrap;gap:6px;padding:10px;border-radius:0}
   .mtop strong{width:100%}
@@ -227,8 +227,8 @@ html{-webkit-text-size-adjust:100%}
   .ftotal{flex-direction:column;align-items:flex-start;gap:2px}
   .ftotal b{font-size:20px}
   #relOpcoes label,#relmodal label{font-size:14px}
-  #termomodal ol{padding-left:18px}
-  #termomodal button{width:100%;margin:3px 0}
+  #termomodal ol,#ssmodal ol{padding-left:18px}
+  #termomodal button,#ssmodal button{width:100%;margin:3px 0}
   .pg{flex-wrap:wrap;justify-content:flex-start}
 }
 @media (max-width:380px){
@@ -297,6 +297,7 @@ html{-webkit-text-size-adjust:100%}
     <button id="btnArq">Escolher arquivo</button>
     <button class="sec" id="btnOrig" hidden>Voltar à planilha original</button>
     <button id="btnTermo">🌡️ Analisar termômetro</button>
+    <button id="btnSS">🔢 Analisar SS</button>
     <button class="sec" id="btnSalvar">💾 Salvar análise</button>
     <button class="sec" id="btnCodigoAtual" title="Salvar e gerar o código de recuperação desta análise">🔑 Código desta análise</button>
     <button class="sec" id="btnAnalises">📂 Minhas análises</button>
@@ -349,6 +350,7 @@ html{-webkit-text-size-adjust:100%}
     <button data-v="mo">Por mão de obra</button>
     <button data-v="mun">Por município</button>
     <button data-v="conf">⚖️ Confronto apontado × pago</button>
+    <button data-v="ss">🔢 Confronto por SS</button>
   </div>
 
   <p id="avisoConf" class="muted" hidden></p>
@@ -434,6 +436,42 @@ html{-webkit-text-size-adjust:100%}
   </div>
 </div>
 
+<div id="ssmodal" hidden>
+  <div class="mbox" style="max-width:720px">
+    <div class="mtop"><strong>🔢 Analisar SS</strong><span style="flex:1"></span>
+      <button class="sec" id="ssFechar">Fechar ✕</button></div>
+    <div style="padding:16px">
+      <p id="ssInfo" style="margin-top:0;font-size:13px"></p>
+      <p class="muted" style="font-size:12.5px">São as mesmas obras do contrato novo, só que o termômetro as identifica pelo
+        <b>número da SS</b> (ex.: <b>17932026</b>) e a medição pelo <b>número da obra</b> (ex.: <b>0202600945</b>).
+        A coleta busca pela SS e o confronto volta pelo número da obra, no mesmo formato da aba de obras.</p>
+
+      <div style="border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin:12px 0;background:var(--panel)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="font-size:13px">📄 Tabela obra × SS</strong><span style="flex:1"></span>
+          <button class="sec" id="ssImportar">Atualizar pela planilha…</button>
+          <button class="sec" id="ssPadrao" title="Voltar à tabela que veio com o sistema">↺ Restaurar padrão</button>
+          <input type="file" id="ssArq" accept=".xls,.xlsx,.xlsm,.csv" hidden>
+        </div>
+        <div class="muted" id="ssMapaInfo" style="font-size:12px;margin-top:6px"></div>
+        <div class="muted" style="font-size:11.5px;margin-top:4px">A planilha precisa ter o nº da obra na coluna <b>A</b> e a SS na coluna <b>B</b> (com ou sem a barra).</div>
+      </div>
+
+      <ol style="font-size:13px;padding-left:20px;line-height:1.7">
+        <li><b>Uma vez só:</b> <button id="ssMarcador">Copiar o coletor de SS</button> <button class="sec" id="ssMostrar">mostrar o endereço</button>
+          e crie um favorito com ele — este coletor é <b>diferente</b> do de obras, guarde-o num favorito separado (ex.: <i>Coletar SS</i>).</li>
+        <li><button class="sec" id="ssAbrir">Abrir o termômetro</button> e, já logado, <b>clique no favorito</b>.</li>
+        <li>Volte aqui, cole no campo abaixo e aplique:</li>
+      </ol>
+      <textarea id="ssCola" placeholder="Cole aqui o resultado da coleta de SS" style="width:100%;height:90px;font:12px monospace;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <button id="ssAplicar">✅ Aplicar e refazer confronto das SS</button>
+        <span id="ssRes" style="font-size:12.5px"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="relmodal" hidden>
   <div class="mbox" style="max-width:620px">
     <div class="mtop"><strong>Gerar relatório do confronto</strong><span style="flex:1"></span>
@@ -512,6 +550,27 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const COLS=["num_obra","descricao_municipio","cod_mobra","cd_mao_de_obra_descricao","qtd_mo_realizada","vlr_total_real","cc_situacao_medicao","tip_operacao"];
 let D = [], META = {}, FONTE = null;
 
+/* ---------- SS: as mesmas obras, identificadas pelo nº da SS no termômetro ---------- */
+const MAPA_SS_PADRAO = {"0202600945": {"ss": "17932026", "equipe": "MNT 01 PTS", "cidade": "PASSAGEM"}, "0202600946": {"ss": "18082026", "equipe": "MNT 01 PTS", "cidade": "PATOS"}, "0202600947": {"ss": "18152026", "equipe": "MNT 01 PTS", "cidade": "TEIXEIRA"}, "0202600948": {"ss": "18462026", "equipe": "MNT 01 PTS", "cidade": "CACIMBA DE AREIA"}, "0202600951": {"ss": "18812026", "equipe": "MNT 01 PTS", "cidade": "SAO MAMEDE"}, "0202600952": {"ss": "19032026", "equipe": "MNT 01 PTS", "cidade": "DESTERRO"}, "0202600953": {"ss": "18792026", "equipe": "MNT 02 CTR", "cidade": "MATO GROSSO"}, "0202600954": {"ss": "18832026", "equipe": "MNT 02 CTR", "cidade": "PAULISTA"}, "0202600961": {"ss": "14862026", "equipe": "MNT 04 CJZ", "cidade": "SAO DOMINGOS DE POMBAL"}, "0202600963": {"ss": "24092025", "equipe": "MNT 06 PRI", "cidade": "PRINCESA ISABEL"}, "0202600964": {"ss": "11792026", "equipe": "MNT 06 PRI", "cidade": "AGUA BRANCA"}, "0202600966": {"ss": "18962026", "equipe": "MNT 06 PRI", "cidade": "TAVARES"}, "0202600967": {"ss": "00062026", "equipe": "MNT 06 PRI", "cidade": "AGUA BRANCA"}, "0202600968": {"ss": "18962026", "equipe": "MNT 06 PRI", "cidade": "JURU"}, "0202600973": {"ss": "18022026", "equipe": "MNT 02 CTR", "cidade": "BREJO DO CRUZ"}, "0202600974": {"ss": "17862026", "equipe": "MNT 02 CTR", "cidade": "COREMAS"}, "0202600976": {"ss": "15872026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202600979": {"ss": "17702026", "equipe": "MNT 04 CJZ", "cidade": "MONTE HOREBE"}, "0202600980": {"ss": "18562026", "equipe": "MNT 01 PTS", "cidade": "TEIXEIRA"}, "0202600981": {"ss": "18922026", "equipe": "MNT 01 PTS", "cidade": "TEIXEIRA"}, "0202600982": {"ss": "18822026", "equipe": "MNT 02 CTR", "cidade": "JERICO"}, "0202600984": {"ss": "18512026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202600985": {"ss": "18722026", "equipe": "MNT 03 SSA", "cidade": "POMBAL"}, "0202600986": {"ss": "18452026", "equipe": "MNT 03 SSA", "cidade": "POMBAL"}, "0202600987": {"ss": "18862026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202600988": {"ss": "18952026", "equipe": "MNT 03 SSA", "cidade": "LASTRO"}, "0202600989": {"ss": "18782026", "equipe": "MNT 04 CJZ", "cidade": "BERNARDINO BATISTA"}, "0202600990": {"ss": "19092026", "equipe": "MNT 04 CJZ", "cidade": "SAO JOAO DO RIO DO PEIXE"}, "0202600991": {"ss": "19082026", "equipe": "MNT 04 CJZ", "cidade": "JOCA CLAUDINO"}, "0202600993": {"ss": "18422026", "equipe": "MNT 06 PRI", "cidade": "IMACULADA"}, "0202600994": {"ss": "17672026", "equipe": "MNT 06 PRI", "cidade": "AGUA BRANCA"}, "0202600995": {"ss": "17522026", "equipe": "MNT 06 PRI", "cidade": "AGUA BRANCA"}, "0202600996": {"ss": "18652026", "equipe": "MNT 06 PRI", "cidade": "PRINCESA ISABEL"}, "0202600997": {"ss": "17792026", "equipe": "MNT 01 PTS", "cidade": "MAE D AGUA"}, "0202600998": {"ss": "17922026", "equipe": "MNT 01 PTS", "cidade": "AREIA DE BARAUNAS"}, "0202600999": {"ss": "17992026", "equipe": "MNT 01 PTS", "cidade": "MAE D AGUA"}, "0202601000": {"ss": "17982026", "equipe": "MNT 01 PTS", "cidade": "VISTA SERRANA"}, "0202601001": {"ss": "18012026", "equipe": "MNT 03 SSA", "cidade": "TRIUNFO"}, "0202601002": {"ss": "17582026", "equipe": "MNT 04 CJZ", "cidade": "SANTA HELENA"}, "0202601003": {"ss": "18062026", "equipe": "MNT 04 CJZ", "cidade": "POCO JOSE DE MOURA"}, "0202601004": {"ss": "18622026", "equipe": "MNT 04 CJZ", "cidade": "POCO JOSE DE MOURA"}, "0202601005": {"ss": "19402026", "equipe": "MNT 04 CJZ", "cidade": "BOM JESUS"}, "0202601006": {"ss": "17802026", "equipe": "MNT 05 ITO", "cidade": "SERRA GRANDE"}, "0202601007": {"ss": "18102026", "equipe": "MNT 05 ITO", "cidade": "PIANCO"}, "0202601008": {"ss": "18552026", "equipe": "MNT 05 ITO", "cidade": "OLHO D AGUA"}, "0202601009": {"ss": "17412026", "equipe": "MNT 04 CJZ", "cidade": "UIRAUNA"}, "0202601011": {"ss": "17382026", "equipe": "MNT 04 CJZ", "cidade": "TRIUNFO"}, "0202601012": {"ss": "18002026", "equipe": "MNT 05 ITO", "cidade": "TAVARES"}, "0202601013": {"ss": "18742026", "equipe": "MNT 05 ITO", "cidade": "PEDRA BRANCA"}, "0202601014": {"ss": "09502026", "equipe": "MNT 01 PTS", "cidade": "PATOS"}, "0202601015": {"ss": "19182026", "equipe": "MNT 01 PTS", "cidade": "PATOS"}, "0202601016": {"ss": "19412026", "equipe": "MNT 01 PTS", "cidade": "PATOS"}, "0202601017": {"ss": "19222026", "equipe": "MNT 02 CTR", "cidade": "SAO BENTO"}, "0202601018": {"ss": "19372026", "equipe": "MNT 01 PTS", "cidade": "CATINGUEIRA"}, "0202601019": {"ss": "19512026", "equipe": "MNT 01 PTS", "cidade": "CACIMBA DE AREIA"}, "0202601021": {"ss": "19452026", "equipe": "MNT 04 CJZ", "cidade": "SAO JOSE DE PIRANHAS"}, "0202601022": {"ss": "19342026", "equipe": "MNT 05 ITO", "cidade": "CONCEICAO"}, "0202601023": {"ss": "19292026", "equipe": "MNT 05 ITO", "cidade": "SANTANA DOS GARROTES"}, "0202601024": {"ss": "19462026", "equipe": "MNT 05 ITO", "cidade": "IGARACI"}, "0202601025": {"ss": "19102026", "equipe": "MNT 06 PRI", "cidade": "IMACULADA"}, "0202601026": {"ss": "19332026", "equipe": "MNT 06 PRI", "cidade": "JURU"}, "0202601027": {"ss": "19042026", "equipe": "MNT 02 CTR", "cidade": "CATOLE DO ROCHA"}, "0202601028": {"ss": "19592026", "equipe": "MNT 02 CTR", "cidade": "SAO BENTO"}, "0202601029": {"ss": "19302026", "equipe": "MNT 06 PRI", "cidade": "IMACULADA"}, "0202601030": {"ss": "19602026", "equipe": "MNT 06 PRI", "cidade": "JURU"}, "0202601034": {"ss": "19272026", "equipe": "MNT 02 CTR", "cidade": "CATOLE DO ROCHA"}, "0202601035": {"ss": "19362026", "equipe": "MNT 02 CTR", "cidade": "CATOLE DO ROCHA"}, "0202601036": {"ss": "19572026", "equipe": "MNT 02 CTR", "cidade": "BOM SUCESSO"}, "0202601037": {"ss": "18932026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202601039": {"ss": "19252026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202601040": {"ss": "22952025", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202601041": {"ss": "19492026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202601042": {"ss": "19382026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202601043": {"ss": "17892026", "equipe": "MNT 03 SSA", "cidade": "SANTA CRUZ"}, "0202601044": {"ss": "19212026", "equipe": "MNT 04 CJZ", "cidade": "POCO DANTAS"}, "0202601045": {"ss": "19662026", "equipe": "MNT 04 CJZ", "cidade": "BOM JESUS"}, "0202601046": {"ss": "17282026", "equipe": "MNT 04 CJZ", "cidade": "CAJAZEIRAS"}, "0202601047": {"ss": "18072026", "equipe": "MNT 05 ITO", "cidade": "CONCEICAO"}, "0202601048": {"ss": "18842026", "equipe": "MNT 05 ITO", "cidade": "CONCEICAO"}, "0202601049": {"ss": "17812026", "equipe": "MNT 05 ITO", "cidade": "SERRA GRANDE"}, "0202601050": {"ss": "19162026", "equipe": "MNT 05 ITO", "cidade": "DIAMANTE"}, "0202601051": {"ss": "19352026", "equipe": "MNT 05 ITO", "cidade": "CONCEICAO"}, "0202601052": {"ss": "01362026", "equipe": "MNT 05 ITO", "cidade": "PIANCO"}, "0202601053": {"ss": "17272026", "equipe": "MNT 06 PRI", "cidade": "TAVARES"}, "0202601054": {"ss": "19202026", "equipe": "MNT 06 PRI", "cidade": "JURU"}, "0202601057": {"ss": "18052026", "equipe": "MNT 02 CTR", "cidade": "SAO BENTO"}, "0202601058": {"ss": "18192026", "equipe": "MNT 02 CTR", "cidade": "MATO GROSSO"}, "0202601059": {"ss": "18432026", "equipe": "MNT 02 CTR", "cidade": "MATO GROSSO"}, "0202601060": {"ss": "19502026", "equipe": "MNT 03 SSA", "cidade": "SOUSA"}, "0202601061": {"ss": "19522026", "equipe": "MNT 05 ITO", "cidade": "IGARACI"}};
+let MAPA_SS = null;
+try{const m=localStorage.getItem("mapa-ss"); if(m) MAPA_SS=JSON.parse(m)}catch(e){}
+if(!MAPA_SS||!Object.keys(MAPA_SS).length) MAPA_SS=Object.assign({},MAPA_SS_PADRAO);
+let SS_INV=null;
+const soDig=v=>String(v==null?"":v).replace(/\D/g,"");
+const ssDaObra=o=>(MAPA_SS[o]||{}).ss||"";
+const temSS=o=>!!ssDaObra(o);
+function invSS(){ if(SS_INV) return SS_INV; SS_INV={};
+  for(const [o,v] of Object.entries(MAPA_SS)) if(v&&v.ss) SS_INV[soDig(v.ss)]=o;
+  return SS_INV }
+const obraDaSS=ss=>invSS()[soDig(ss)]||"";
+function salvarMapaSS(){ SS_INV=null; try{localStorage.setItem("mapa-ss",JSON.stringify(MAPA_SS))}catch(e){} }
+
+/* modo do confronto em uso: "obra" (aba ⚖️) ou "ss" (aba 🔢) */
+let MODO="obra";
+let CONFRONTO_SS={linhas:[],naoencontradas:[]}, EQUIPES_SS={};
+const CF=()=>MODO==="ss"?CONFRONTO_SS:CONFRONTO;
+const EQ=()=>MODO==="ss"?EQUIPES_SS:EQUIPES;
+
 const brl=v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nnum=v=>v.toLocaleString("pt-BR",{maximumFractionDigits:2});
 
@@ -587,7 +646,7 @@ function render(){
     if(!sortKey){sortKey="cd_mao_de_obra_descricao";sortDir=1}
     ordenar(dados);
     body=dados.slice(0,limite).map(g=>`<tr><td>${badge(contratoDe(g.cod_mobra))}</td><td>${g.cod_mobra}</td><td>${esc(g.cd_mao_de_obra_descricao)}${marcaLV(g.cd_mao_de_obra_descricao)}</td><td class="num">${g.n}</td><td class="num">${nnum(g.qtd)}</td><td class="num">${brl(g.vlr)}</td></tr>`).join("");
-  } else if(vista==="conf"){
+  } else if(vista==="conf"||vista==="ss"){
     return renderConfronto();
   } else {
     dados=agrupar(rows,["descricao_municipio"]);
@@ -691,7 +750,7 @@ function adicionarServico(obra,dados){
   const cod=String(dados.cod||"").trim();
   if(!cod) return "Informe o código do serviço.";
   const op=dados.op==="R"?"R":"I";
-  const jaNoConfronto=CONFRONTO.linhas.some(l=>l[0]===obra&&l[2]===op&&l[3]===cod);
+  const jaNoConfronto=CF().linhas.some(l=>l[0]===obra&&l[2]===op&&l[3]===cod);
   if(jaNoConfronto) return "Este serviço já está na ficha desta obra — edite a quantidade nele.";
   if(ehAdicionado(obra,op,cod)) return "Este serviço já foi acrescentado nesta obra.";
   const num=v=>{const n=parseFloat(String(v).replace(",",".")); return isNaN(n)||n<0?0:Math.round(n*100)/100};
@@ -758,7 +817,7 @@ let SUSPEITAS=null;
 function obrasSuspeitas(){
   if(SUSPEITAS) return SUSPEITAS;
   const assin=new Map();
-  for(const l of CONFRONTO.linhas){
+  for(const l of CF().linhas){
     if(!(l[5]>0)) continue;
     const a=assin.get(l[0])||[]; a.push(l[2]+l[3]+":"+l[5]); assin.set(l[0],a);
   }
@@ -775,9 +834,11 @@ function obrasSuspeitas(){
 function confrontoPorObra(){
   if(CONF_CACHE) return CONF_CACHE;
   const m=new Map();
-  for(const r of CONFRONTO.linhas.concat(linhasAdicionadas())){
+  for(const r of CF().linhas.concat(linhasAdicionadas())){
     /* itens inativos não somam nos totais */
     let [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
+    /* cada aba mostra só o seu universo: a 🔢 as obras com SS, a ⚖️ as demais */
+    if(MODO==="ss" ? !temSS(obra) : temSS(obra)) continue;
     const acrescentado=ehAdicionado(obra,op,cod);
     if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,conf:0,inat:0,naoenc:false,itens:[]});
     const g=m.get(obra);
@@ -826,10 +887,11 @@ function renderConfronto(){
     ["Pendentes de validação",nnum(G.filter(g=>!VALIDADAS[g.obra]).length),""],
     ["💰 A cobrar",brl(G.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0)),"cob"],
     ["Obras não encontradas",nnum(G.filter(g=>g.naoenc).length),""]
-  ].map(([l,v,c])=>`<div class="card ${c}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
+  ].concat(MODO==="ss"?[["SS mapeadas",nnum(Object.keys(MAPA_SS).length),""]]:[]).map(([l,v,c])=>`<div class="card ${c}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
 
+  const eSS=MODO==="ss";
   const t=document.getElementById("tbl");
-  t.tHead.innerHTML=`<tr><th>Nº da obra</th><th>Descrição da obra</th><th>Município</th><th>Equipe (termômetro)</th>
+  t.tHead.innerHTML=`<tr><th>Nº da obra</th>${eSS?"<th>SS (termômetro)</th>":""}<th>Descrição da obra</th><th>Município</th><th>Equipe (termômetro)</th>
     <th class="num">Divergências</th><th class="num">Conferidos</th><th class="num">Fora da análise</th><th>Validação</th><th>Cobrança</th>
     <th class="num" data-k="pend">Pendente de pagamento${sortKey==="pend"?(sortDir>0?" ▲":" ▼"):""}</th>
     <th class="num">Pago a mais</th><th class="num">Sem apontamento</th><th>Situação</th></tr>`;
@@ -842,19 +904,20 @@ function renderConfronto(){
     const temLV=g.itens.some(x=>ehLV(x.serv));
     const susp=obrasSuspeitas().has(g.obra);
     return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}</td>
+      ${eSS?`<td><b>${esc(ssDaObra(g.obra)||"—")}</b></td>`:""}
       <td class="trunc" title="${esc(desc)}">${esc(desc)||"—"}</td><td>${esc(g.mun)}</td>
-      <td>${(EQUIPES[g.obra]||{}).equipe? esc(EQUIPES[g.obra].equipe) : '<span class="muted">—</span>'}${susp?' <span class="tagSusp" title="Apontamento idêntico ao de outra obra — confira no termômetro">⚠️ conferir</span>':""}</td>
+      <td>${(EQ()[g.obra]||{}).equipe? esc(EQ()[g.obra].equipe) : '<span class="muted">—</span>'}${susp?' <span class="tagSusp" title="Apontamento idêntico ao de outra obra — confira no termômetro">⚠️ conferir</span>':""}</td>
       <td class="num">${g.div}</td><td class="num">${g.conf}</td><td class="num">${g.inat||"—"}</td>
       <td>${VALIDADAS[g.obra]?`<span class="tag s-ok">✔️ Validada</span>`:`<span class="tag s-parc">⏳ Pendente</span>`}</td>
       <td>${COBRANCAS[g.obra]?`<span class="tag s-cob">💰 A cobrar</span>`:`<span class="muted">—</span>`}</td>
       <td class="num">${g.pend?brl(g.pend):"—"}</td><td class="num">${g.maior?brl(g.maior):"—"}</td>
       <td class="num">${g.sem?brl(g.sem):"—"}</td><td>${et}</td></tr>`}).join("")
-    ||`<tr><td colspan="13" class="muted" style="padding:20px">Nenhuma obra no filtro atual.</td></tr>`;
+    ||`<tr><td colspan="${eSS?14:13}" class="muted" style="padding:20px">Nenhuma obra no filtro atual.</td></tr>`;
   document.getElementById("info").textContent=`Exibindo ${Math.min(limite,G.length)} de ${nnum(G.length)} obras`;
   document.getElementById("mais").hidden=G.length<=limite;
   atualizarBotaoInativos(true);
-  window._exp={head:[["obra","Nº da obra"],["mun","Município"],["div","Divergências"],["conf","Conferidos"],
-      ["pend","Pendente de pagamento"],["maior","Pago a mais"],["sem","Pago sem apontamento"]],dados:G};
+  window._exp={head:[["obra","Nº da obra"],...(eSS?[["ss","SS"]]:[]),["mun","Município"],["div","Divergências"],["conf","Conferidos"],
+      ["pend","Pendente de pagamento"],["maior","Pago a mais"],["sem","Pago sem apontamento"]],dados:eSS?G.map(g=>Object.assign({},g,{ss:ssDaObra(g.obra)})):G};
 }
 
 /* ficha de confronto de uma obra — mesmo padrão da ficha da obra */
@@ -900,7 +963,7 @@ function desenharFichaConfronto(){
       </tbody><tfoot><tr><th colspan="6">${titulo} — total</th><th class="num"></th><th class="num">${brl(sv)}</th><th></th></tr></tfoot></table></div>`;
   };
 
-  const eqObra=(EQUIPES[num]||{}).equipe;
+  const eqObra=(EQ()[num]||{}).equipe;
   const naoenc = g.naoenc ? `<div class="secao nao"><div class="stitulo">⚠️ Sem apontamento no termômetro</div>
       <div class="vazio muted">${eqObra
         ? `A obra está cadastrada no termômetro na equipe <b>${esc(eqObra)}</b>, mas nenhum serviço foi apontado nela — a geração da planilha retorna "Nenhuma equipe encontrada para gerar a planilha".`
@@ -913,7 +976,7 @@ function desenharFichaConfronto(){
       <div class="fnum">Obra ${num}</div>
       <div class="fdesc">${esc(m.desc||"")}${g.mun?" · "+esc(g.mun):""}</div>
       ${obrasSuspeitas().has(num)?`<div class="avisoSusp">⚠️ <b>Coleta a conferir:</b> o apontamento desta obra é idêntico ao de outra obra, o que indica que a busca no termômetro devolveu o resultado errado. Confira no termômetro antes de usar estes números — inclusive a equipe.</div>`:""}
-      ${(EQUIPES[num]||{}).equipe?`<div class="fdesc" style="margin-top:2px">👷 Equipe: <b>${esc(EQUIPES[num].equipe)}</b>${EQUIPES[num].data?` · última atualização no termômetro em ${esc(EQUIPES[num].data)}`:""}</div>`:""}
+      ${(EQ()[num]||{}).equipe?`<div class="fdesc" style="margin-top:2px">👷 Equipe: <b>${esc(EQ()[num].equipe)}</b>${EQ()[num].data?` · última atualização no termômetro em ${esc(EQ()[num].data)}`:""}</div>`:""}
       <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}</div>
     </div></div>
     ${naoenc}
@@ -1098,15 +1161,20 @@ document.getElementById("csvobra").onclick=()=>{
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); vista=b.dataset.v; sortKey=null; sortDir=1; limite=200;
-  const conf=vista==="conf";
+  const conf=vista==="conf"||vista==="ss";
+  const novoModo = vista==="ss" ? "ss" : "obra";
+  if(novoModo!==MODO){ MODO=novoModo; invalidarConfronto(); invalidarCatalogo(); UNIT=null }
   document.getElementById("fsitconf").hidden=!conf;
   ["fsit","fmo","fcon"].forEach(id=>document.getElementById(id).hidden=conf);
   document.getElementById("xlsx").hidden=conf;
   document.getElementById("btnRel").hidden=!conf;
   const av=document.getElementById("avisoConf"); av.hidden=!conf;
   atualizarBotaoInativos(conf);
-  if(conf) av.innerHTML="⚖️ <b>Apontado</b> = termômetro de serviços (planilha simplificada por obra, lida em 11/08/2026) · <b>Pago</b> = esta medição. "+
-    "Abrange apenas o <b>novo contrato</b> (códigos 6xxxx): 39 obras da medição, 37 localizadas no termômetro.";
+  if(vista==="ss") av.innerHTML="🔢 <b>Apontado</b> = termômetro, pesquisado pelo <b>nº da SS</b> · <b>Pago</b> = medição carregada, pelo <b>nº da obra</b>. "+
+    `Tabela obra × SS com <b>${nnum(Object.keys(MAPA_SS).length)}</b> SS · <b>${nnum(obrasSS().length)}</b> delas presentes nesta medição.`+
+    (CONFRONTO_SS.linhas.length?"":' — <b>rode a coleta em “🔢 Analisar SS”</b> para preencher esta aba.');
+  else if(conf) av.innerHTML="⚖️ <b>Apontado</b> = termômetro de serviços (planilha simplificada por obra) · <b>Pago</b> = esta medição. "+
+    "Abrange o <b>novo contrato</b> (códigos 6xxxx), sem as obras identificadas por SS — essas ficam na aba 🔢.";
   render();
 });
 ["q","fmun","fsit","fmo","fcon","fsitconf"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{limite=200;render()}));
@@ -1299,16 +1367,21 @@ const lerIndice=()=>{try{return JSON.parse(localStorage.getItem(IDX)||"[]")}catc
 const gravarIndice=l=>{try{localStorage.setItem(IDX,JSON.stringify(l))}catch(e){}};
 
 function resumoAtual(){
-  const G=(typeof confrontoPorObra==="function"&&CONFRONTO&&CONFRONTO.linhas.length)?confrontoPorObra():[];
-  return {obras:G.length, pendencia:G.reduce((a,g)=>a+g.pend,0),
-    validadas:G.filter(g=>VALIDADAS[g.obra]).length,
-    cobranca:G.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0),
+  const antes=MODO;
+  const grupos=m=>{MODO=m; invalidarConfronto(); return CF().linhas.length?confrontoPorObra():[]};
+  const G=grupos("obra"), S=grupos("ss");
+  MODO=antes; invalidarConfronto();
+  const T=G.concat(S);
+  return {obras:G.length, obrasSS:S.length,
+    pendencia:T.reduce((a,g)=>a+g.pend,0),
+    validadas:T.filter(g=>VALIDADAS[g.obra]).length,
+    cobranca:T.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0),
     lancamentos:D.length};
 }
 function gravarAnalise(id,nome,silencioso){
   const base={id,nome,quando:new Date().toISOString(),
     arquivo:(FONTE&&FONTE.nome)||"", aba:(FONTE&&FONTE.aba)||"", datas:(FONTE&&FONTE.datas)||[],
-    confronto:CONFRONTO, equipes:EQUIPES, edicoes:EDICOES,
+    confronto:CONFRONTO, equipes:EQUIPES, confrontoSS:CONFRONTO_SS, equipesSS:EQUIPES_SS, mapaSS:MAPA_SS, edicoes:EDICOES,
     inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, resumo:resumoAtual()};
   const aviso=t=>{const el=document.getElementById("fonte"); if(el&&!silencioso) el.innerHTML=t};
   let completa=true;
@@ -1333,13 +1406,16 @@ function abrirAnalise(id){
   if(a.aoa&&a.aoa.length){ try{ processarPlanilha(a.aoa,a.arquivo||a.nome,{datas:a.datas,aba:a.aba}) }catch(e){} }
   if(a.confronto) CONFRONTO=a.confronto;
   if(a.equipes) EQUIPES=a.equipes;
+  CONFRONTO_SS=a.confrontoSS||{linhas:[],naoencontradas:[]};
+  EQUIPES_SS=a.equipesSS||{};
+  if(a.mapaSS&&Object.keys(a.mapaSS).length){ MAPA_SS=a.mapaSS; salvarMapaSS() }
   EDICOES=a.edicoes||{}; salvarEdicoes();
   INATIVOS=new Set(a.inativos||[]); salvarInativos(); invalidarConfronto(); UNIT=null;
   CONFERIDOS=a.conferidos||{}; salvarConferidos();
   ADICIONADOS=a.adicionados||{}; salvarAdicionados(); invalidarCatalogo();
   VALIDADAS=a.validadas||{}; salvarValidadas();
   COBRANCAS=a.cobrancas||{}; salvarCobrancas();
-  ANALISE_ATUAL={id:a.id,nome:a.nome}; invalidarCatalogo(); salvarRascunho();
+  ANALISE_ATUAL={id:a.id,nome:a.nome}; MODO="obra"; invalidarConfronto(); invalidarCatalogo(); salvarRascunho();
   const el=document.getElementById("fonte");
   if(el) el.innerHTML=`📂 <b>${esc(a.nome)}</b> — salva em ${new Date(a.quando).toLocaleString("pt-BR")}`+
     (a.aoa? ` · ${esc(a.arquivo||"planilha")}`:" · só o confronto (recarregue a planilha para as demais abas)");
@@ -1569,6 +1645,7 @@ document.getElementById("btnSalvar").onclick=()=>{
 const RASC="confronto-rascunho";
 function salvarRascunho(){
   try{ localStorage.setItem(RASC,JSON.stringify({confronto:CONFRONTO,equipes:EQUIPES,
+    confrontoSS:CONFRONTO_SS,equipesSS:EQUIPES_SS,
     analise:ANALISE_ATUAL,quando:Date.now()})) }catch(e){}
 }
 function restaurarRascunho(){
@@ -1577,6 +1654,8 @@ function restaurarRascunho(){
   if(!r||!r.confronto||!r.confronto.linhas) return false;
   CONFRONTO=r.confronto;
   if(r.equipes) EQUIPES=r.equipes;
+  if(r.confrontoSS) CONFRONTO_SS=r.confrontoSS;
+  if(r.equipesSS) EQUIPES_SS=r.equipesSS;
   if(r.analise) ANALISE_ATUAL=r.analise;
   invalidarConfronto(); invalidarCatalogo(); UNIT=null;
   return true;
@@ -1603,24 +1682,38 @@ function ofertaInicial(){
 const TERMO_URL="https://termometro-teccel-v2.vercel.app/administrativo";
 
 /* obras do novo contrato presentes na medição carregada */
-function obrasNovoContrato(){
+function obrasDoNovo(){
   return [...new Set(D.filter(r=>contratoDe(r.cod_mobra)==="novo").map(r=>r.num_obra))].sort();
 }
+/* obras pesquisadas no termômetro pelo próprio número (as que não têm SS) */
+function obrasNovoContrato(){ return obrasDoNovo().filter(o=>!temSS(o)) }
+/* obras da medição que o termômetro identifica pela SS */
+function obrasSS(){ return obrasDoNovo().filter(temSS) }
+/* as SS correspondentes, na mesma ordem */
+function ssParaColetar(){ return obrasSS().map(o=>soDig(ssDaObra(o))) }
 
 /* recalcula o confronto a partir do apontado coletado no termômetro */
-function calcularConfronto(apont){
+function calcularConfronto(apont,modo){
+  modo = modo==="ss" ? "ss" : "obra";
+  /* cada modo cuida do seu universo: SS de um lado, obras sem SS do outro */
+  const noEscopo = o => modo==="ss" ? temSS(o) : !temSS(o);
   const pago=new Map(), unit=new Map(), desc=new Map(), mun=new Map();
   for(const r of D){
     if(contratoDe(r.cod_mobra)!=="novo") continue;
+    if(!noEscopo(r.num_obra)) continue;
     const k=r.num_obra+"|"+r.tip_operacao+"|"+r.cod_mobra;
     const a=pago.get(k)||{q:0,v:0}; a.q+=r.qtd_mo_realizada; a.v+=r.vlr_total_real; pago.set(k,a);
     if(!desc.has(r.cod_mobra)) desc.set(r.cod_mobra,r.cd_mao_de_obra_descricao);
     if(!mun.has(r.num_obra)) mun.set(r.num_obra,r.descricao_municipio);
     if(r.qtd_mo_realizada) unit.set(r.tip_operacao+"|"+r.cod_mobra, r.vlr_total_real/r.qtd_mo_realizada);
   }
-  const ap=new Map(), semApont=new Set(), equipes={};
-  for(const [obra,o] of Object.entries(apont.obras||{})){
-    equipes[obra]={equipe:o.equipe||"",data:o.data||""};
+  const ap=new Map(), semApont=new Set(), equipes={}, vistas=new Set();
+  for(const [chave,o] of Object.entries(apont.obras||{})){
+    /* na coleta por SS a chave é o número da SS — volta para o número da obra da medição */
+    const obra = modo==="ss" ? (obraDaSS(chave)||chave) : chave;
+    if(!noEscopo(obra)) continue;
+    vistas.add(obra);
+    equipes[obra]={equipe:o.equipe||"",data:o.data||"",ss:modo==="ss"?soDig(chave):""};
     if(!o.itens||!o.itens.length){semApont.add(obra);continue}
     for(const it of o.itens){
       const k=obra+"|"+it.op+"|"+it.cod;
@@ -1633,7 +1726,7 @@ function calcularConfronto(apont){
     const [obra,op,cod]=k.split("|");
     const A=ap.get(k)||{q:0,v:0}, P=pago.get(k)||{q:0,v:0};
     let sit;
-    if(semApont.has(obra)||!(obra in (apont.obras||{}))) sit="Obra não encontrada no termômetro";
+    if(semApont.has(obra)||!vistas.has(obra)) sit="Obra não encontrada no termômetro";
     else if(A.q>0&&P.q===0) sit="Pendente de pagamento";
     else if(A.q>P.q) sit="Pagamento parcial";
     else if(P.q>A.q&&A.q>0) sit="Pago a mais";
@@ -1644,19 +1737,26 @@ function calcularConfronto(apont){
     linhas.push([obra,mun.get(obra)||"",op,cod,desc.get(cod)||"",A.q,P.q,dif,Math.round(dif*u*100)/100,sit]);
   }
   linhas.sort((a,b)=> a[0]===b[0] ? String(a[4]).localeCompare(String(b[4]),"pt-BR") : a[0].localeCompare(b[0]));
-  CONFRONTO={linhas,naoencontradas:[...semApont].sort()};
-  EQUIPES=equipes; salvarRascunho();
-  INATIVOS.clear(); salvarInativos(); invalidarConfronto(); invalidarCatalogo(); UNIT=null;
+  if(modo==="ss"){ CONFRONTO_SS={linhas,naoencontradas:[...semApont].sort()}; EQUIPES_SS=equipes; }
+  else { CONFRONTO={linhas,naoencontradas:[...semApont].sort()}; EQUIPES=equipes; }
+  salvarRascunho();
+  /* só os itens do universo recalculado saem de "fora da análise" */
+  for(const k of [...INATIVOS]) if(noEscopo(String(k).split("|")[0])) INATIVOS.delete(k);
+  salvarInativos(); invalidarConfronto(); invalidarCatalogo(); UNIT=null;
   return {linhas:linhas.length,obras:new Set(linhas.map(l=>l[0])).size,semApont:semApont.size};
 }
 
 /* script que o usuário cola no termômetro (somente leitura) */
-function scriptColeta(){
-  const obras=JSON.stringify(obrasNovoContrato());
+function scriptColeta(modo){
+  const eSS = modo==="ss";
+  const obras=JSON.stringify(eSS?ssParaColetar():obrasNovoContrato());
+  /* no modo SS, o que se pesquisa é a SS; a planilha pode trazer no cabeçalho a SS ou o nº da obra */
+  const alvos=JSON.stringify(eSS?Object.fromEntries(obrasSS().map(o=>[soDig(ssDaObra(o)),soDig(o)])):{});
   return `/* Coletor do confronto — roda dentro do termômetro, apenas LENDO.
    Não altera dados e não baixa arquivos: as planilhas são lidas na memória. */
 (async()=>{
 const OBRAS=${obras};
+const ALVOS=${alvos};
 const cap=[]; const origURL=URL.createObjectURL;
 URL.createObjectURL=function(b){try{cap.push(b)}catch(e){} return origURL.call(URL,b)};
 /* nada é baixado: o bundle importa saveAs internamente, então o bloqueio é no elemento/evento */
@@ -1756,7 +1856,10 @@ for(let i=0;i<OBRAS.length;i++){
       const L=await lerZip(cap[cap.length-1]); let secao="";
       /* confere o número da obra dentro da planilha: se vier outra, descarta */
       const cabObra=(L.find(c=>c.A&&/^OBRA/i.test(String(c.A)))||{}).B;
-      if(cabObra && String(cabObra).trim()!==obra){
+      const dig=x=>String(x==null?"":x).replace(/\\D/g,"");
+      const confere = !cabObra || String(cabObra).trim()===obra
+        || dig(cabObra)===dig(obra) || (ALVOS[obra] && dig(cabObra)===ALVOS[obra]);
+      if(!confere){
         console.warn("descartado: pesquisei",obra,"e a planilha veio da obra",String(cabObra).trim());
         res.obras[obra]={equipe:"",data:"",itens:[],naoConfirmada:true};
         passo(i+1,"obra "+obra+" — resultado não confere, descartado");
@@ -1810,12 +1913,12 @@ document.getElementById("termomodal").addEventListener("click",e=>{if(e.target.i
 document.getElementById("termoAbrir").onclick=()=>window.open(TERMO_URL,"_blank","noopener");
 document.getElementById("termoMostrar").onclick=()=>{
   const t=document.getElementById("termoCola");
-  t.value="javascript:"+encodeURIComponent(scriptColeta().replace(/\/\*[\s\S]*?\*\//g,"").trim());
+  t.value="javascript:"+encodeURIComponent(scriptColeta("obra").replace(/\/\*[\s\S]*?\*\//g,"").trim());
   t.focus(); t.select();
   document.getElementById("termoRes").innerHTML="O endereço está no campo abaixo, já selecionado — copie com <b>Ctrl+C</b> e cole na URL do favorito. São cerca de 12 mil caracteres; copie tudo.";
 };
 document.getElementById("termoMarcador").onclick=async()=>{
-  const bm="javascript:"+encodeURIComponent(scriptColeta().replace(/\/\*[\s\S]*?\*\//g,"").trim());
+  const bm="javascript:"+encodeURIComponent(scriptColeta("obra").replace(/\/\*[\s\S]*?\*\//g,"").trim());
   const el=document.getElementById("termoRes");
   try{await navigator.clipboard.writeText(bm);
     el.innerHTML="✅ Coletor copiado. Cole no campo <b>URL</b> de um favorito novo (ou atualize o que já existe) e depois clique nele dentro do termômetro.";}
@@ -1828,7 +1931,8 @@ document.getElementById("termoAplicar").onclick=()=>{
   try{dados=JSON.parse(document.getElementById("termoCola").value.trim())}
   catch(e){el.innerHTML='<span style="color:var(--bad)">❌ O conteúdo colado não é um resultado válido do termômetro.</span>';return}
   if(!dados||!dados.obras){el.innerHTML='<span style="color:var(--bad)">❌ Faltam as obras no conteúdo colado.</span>';return}
-  const r=calcularConfronto(dados);
+  MODO="obra"; invalidarConfronto(); invalidarCatalogo(); UNIT=null;
+  const r=calcularConfronto(dados,"obra");
   vista="conf"; sortKey=null; sortDir=1; limite=200;
   document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.v==="conf"));
   document.getElementById("fsitconf").hidden=false;
@@ -1840,6 +1944,116 @@ document.getElementById("termoAplicar").onclick=()=>{
   render(); if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
   el.innerHTML=`✅ Confronto refeito: <b>${nnum(r.obras)} obras</b> e <b>${nnum(r.linhas)} linhas</b>.`;
   setTimeout(()=>{document.getElementById("termomodal").hidden=true},1200);
+};
+
+
+/* ---------- aba SS: mesmas obras, pesquisadas no termômetro pelo número da SS ---------- */
+function irParaAba(v){
+  vista=v; sortKey=null; sortDir=1; limite=200;
+  MODO = v==="ss" ? "ss" : "obra"; invalidarConfronto(); invalidarCatalogo(); UNIT=null;
+  document.querySelectorAll(".tabs button").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
+  const conf = v==="conf"||v==="ss";
+  document.getElementById("fsitconf").hidden=!conf;
+  ["fsit","fmo","fcon"].forEach(id=>document.getElementById(id).hidden=conf);
+  document.getElementById("xlsx").hidden=conf;
+  document.getElementById("btnRel").hidden=!conf;
+  document.getElementById("avisoConf").hidden=!conf;
+}
+function ssMapaResumo(){
+  const total=Object.keys(MAPA_SS).length, naMedicao=obrasSS().length;
+  document.getElementById("ssMapaInfo").innerHTML =
+    total ? `<b>${nnum(total)}</b> obras com SS na tabela · <b>${nnum(naMedicao)}</b> presentes na medição carregada.`
+          : '<span style="color:var(--bad)">Nenhuma obra com SS cadastrada — importe a planilha obra × SS.</span>';
+}
+function abrirSS(){
+  const n=obrasSS().length;
+  document.getElementById("ssInfo").innerHTML = n
+    ? `A medição carregada tem <b>${nnum(n)} obras identificadas por SS</b> para consultar no termômetro.`
+    : `<span style="color:var(--bad)">Nenhuma obra da medição carregada aparece na tabela obra × SS — confira a tabela abaixo ou carregue a medição certa.</span>`;
+  document.getElementById("ssRes").innerHTML="";
+  document.getElementById("ssCola").value="";
+  ssMapaResumo();
+  document.getElementById("ssmodal").hidden=false;
+}
+document.getElementById("btnSS").onclick=abrirSS;
+document.getElementById("ssFechar").onclick=()=>{document.getElementById("ssmodal").hidden=true};
+document.getElementById("ssmodal").addEventListener("click",e=>{if(e.target.id==="ssmodal")document.getElementById("ssmodal").hidden=true});
+document.getElementById("ssAbrir").onclick=()=>window.open(TERMO_URL,"_blank","noopener");
+document.getElementById("ssMostrar").onclick=()=>{
+  const t=document.getElementById("ssCola");
+  t.value="javascript:"+encodeURIComponent(scriptColeta("ss").replace(/\/\*[\s\S]*?\*\//g,"").trim());
+  t.focus(); t.select();
+  document.getElementById("ssRes").innerHTML="O endereço está no campo abaixo, já selecionado — copie com <b>Ctrl+C</b> e cole na URL do favorito.";
+};
+document.getElementById("ssMarcador").onclick=async()=>{
+  const bm="javascript:"+encodeURIComponent(scriptColeta("ss").replace(/\/\*[\s\S]*?\*\//g,"").trim());
+  const el=document.getElementById("ssRes");
+  try{await navigator.clipboard.writeText(bm);
+    el.innerHTML="✅ Coletor de SS copiado. Cole no campo <b>URL</b> de um favorito novo e clique nele dentro do termômetro.";}
+  catch(e){const t=document.getElementById("ssCola"); t.value=bm; t.select();
+    el.innerHTML="Está no campo abaixo: selecione tudo, copie e cole na URL de um favorito novo.";}
+};
+
+/* tabela obra × SS: coluna A = nº da obra, coluna B = SS */
+document.getElementById("ssImportar").onclick=()=>document.getElementById("ssArq").click();
+document.getElementById("ssArq").onchange=e=>{ lerMapaSS(e.target.files[0]); e.target.value="" };
+document.getElementById("ssPadrao").onclick=()=>{
+  if(!confirm("Voltar à tabela obra × SS que veio com o sistema?")) return;
+  MAPA_SS=Object.assign({},MAPA_SS_PADRAO); salvarMapaSS();
+  invalidarConfronto(); invalidarCatalogo();
+  ssMapaResumo(); abrirSS();
+  document.getElementById("ssRes").innerHTML="↺ Tabela padrão restaurada.";
+};
+function lerMapaSS(file){
+  if(!file) return;
+  const el=document.getElementById("ssRes");
+  el.textContent="Lendo "+file.name+"…";
+  const fr=new FileReader();
+  fr.onload=ev=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array",cellDates:false});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+      const novo={}; let ignoradas=0;
+      for(const L of aoa){
+        const obra=String(L[0]==null?"":L[0]).trim();
+        const ss=soDig(L[1]);
+        if(!obra||!ss) continue;
+        if(!/^\d{6,}$/.test(obra.replace(/\D/g,""))){ ignoradas++; continue }
+        novo[obra]={ss, equipe:String(L[3]==null?"":L[3]).trim(), cidade:String(L[4]==null?"":L[4]).trim()};
+      }
+      if(!Object.keys(novo).length){
+        el.innerHTML='<span style="color:var(--bad)">❌ Não encontrei pares obra × SS nas colunas A e B dessa planilha.</span>';
+        return;
+      }
+      MAPA_SS=novo; salvarMapaSS();
+      invalidarConfronto(); invalidarCatalogo(); UNIT=null;
+      ssMapaResumo(); abrirSS();
+      el.innerHTML=`✅ Tabela atualizada: <b>${nnum(Object.keys(novo).length)}</b> obras com SS${ignoradas?` (${ignoradas} linha(s) ignorada(s))`:""}.`;
+      if(vista==="ss"||vista==="conf") render();
+    }catch(err){ el.innerHTML='<span style="color:var(--bad)">❌ '+esc(err.message)+"</span>" }
+  };
+  fr.onerror=()=>{el.innerHTML='<span style="color:var(--bad)">❌ Não foi possível ler o arquivo.</span>'};
+  fr.readAsArrayBuffer(file);
+}
+
+document.getElementById("ssAplicar").onclick=()=>{
+  const el=document.getElementById("ssRes");
+  let dados;
+  try{dados=JSON.parse(document.getElementById("ssCola").value.trim())}
+  catch(e){el.innerHTML='<span style="color:var(--bad)">❌ O conteúdo colado não é um resultado válido do termômetro.</span>';return}
+  if(!dados||!dados.obras){el.innerHTML='<span style="color:var(--bad)">❌ Faltam as SS no conteúdo colado.</span>';return}
+  const semMapa=Object.keys(dados.obras).filter(k=>!obraDaSS(k)).length;
+  const r=calcularConfronto(dados,"ss");
+  irParaAba("ss");
+  const av=document.getElementById("avisoConf");
+  av.innerHTML=`🔢 <b>Apontado</b> = termômetro pesquisado pela <b>SS</b> (coletado em ${new Date(dados.gerado||Date.now()).toLocaleString("pt-BR")}) · `+
+    `<b>Pago</b> = medição carregada, pelo <b>nº da obra</b>. ${nnum(r.obras)} obras confrontadas`+
+    (r.semApont?`, ${nnum(r.semApont)} sem apontamento`:"")+
+    (semMapa?` · <b>${nnum(semMapa)} SS coletada(s) sem obra correspondente na tabela</b>`:"")+".";
+  render(); if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+  el.innerHTML=`✅ Confronto das SS refeito: <b>${nnum(r.obras)} obras</b> e <b>${nnum(r.linhas)} linhas</b>.`;
+  setTimeout(()=>{document.getElementById("ssmodal").hidden=true},1200);
 };
 
 /* ---------- relatório do confronto (PDF e PNG) — mesmo padrão visual da ficha ---------- */
@@ -1880,7 +2094,7 @@ function relDados(){
       return {sit,itens:its,total:its.reduce((a,x)=>a+relVal(x),0),
               inst:its.filter(x=>x.op==="I").length, retir:its.filter(x=>x.op==="R").length};
     }).filter(s=>s.itens.length);
-    out.push({obra:g.obra,mun:g.mun,desc:(META[g.obra]||{}).desc||"",equipe:(EQUIPES[g.obra]||{}).equipe||"",secoes,itens,
+    out.push({obra:g.obra,ss:ssDaObra(g.obra),mun:g.mun,desc:(META[g.obra]||{}).desc||"",equipe:(EQ()[g.obra]||{}).equipe||"",secoes,itens,
       pend:g.pend, naoenc:g.naoenc, inat:g.inat||0,
       total:itens.reduce((a,x)=>a+relVal(x),0)});
   }
@@ -1904,8 +2118,11 @@ function relCabecalho(){
   if(mun) f.push("Município: "+mun);
   if(q) f.push('Busca: "'+q+'"');
   if(INATIVOS.size) f.push(INATIVOS.size+" serviço(s) fora da análise");
-  return {titulo: relObra ? "Confronto da obra "+relObra : "Confronto apontado × pago — novo contrato",
-    sub:"Apontado: termômetro de serviços · Pago: medição 11.08 · Gerado em "+new Date().toLocaleString("pt-BR"),
+  const ss = relObra ? ssDaObra(relObra) : "";
+  return {titulo: relObra ? ("Confronto da obra "+relObra+(ss?" · SS "+ss:""))
+                          : ("Confronto apontado × pago — "+(MODO==="ss"?"obras por SS":"novo contrato")),
+    sub:"Apontado: termômetro de serviços"+(MODO==="ss"?" (pesquisado pela SS)":"")+
+        " · Pago: medição carregada · Gerado em "+new Date().toLocaleString("pt-BR"),
     filtros:f.join(" · ")};
 }
 
@@ -1932,7 +2149,7 @@ function relHTML(){
   const soUmaObra = !!relObra;
   const obra=(o)=>`${soUmaObra?"":`<div class="robl">
     <div class="robra">
-      <div class="rnum">Obra ${o.obra}</div>
+      <div class="rnum">Obra ${o.obra}${o.ss?` · SS ${o.ss}`:""}</div>
       <div class="rdesc">${esc(o.desc)}${o.mun?" · "+esc(o.mun):""}</div>
       ${o.equipe?`<div class="rdesc">Equipe: <b>${esc(o.equipe)}</b></div>`:""}
       <div class="rtags"><span class="rtag" style="background:#f3e8ff;color:#7e22ce;border-color:#a855f7">Novo contrato</span>
@@ -1959,10 +2176,10 @@ function relHTML(){
     ${d.det ? d.obras.map(obra).join("")
       : `<div class="rsec" style="border-color:#334155"><div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
           <span>Totais por obra</span><span class="rcont">${d.obras.length} obras</span><span class="rtot">${brl(d.total)}</span></div>
-        <table><thead><tr><th>Obra</th><th>Descrição</th><th>Município</th><th>Equipe</th><th class="r">Serviços</th><th class="r">Valor</th></tr></thead>
-        <tbody>${d.obras.map(o=>`<tr><td>${o.obra}</td><td>${esc(o.desc)}</td><td>${esc(o.mun)}</td><td>${esc(o.equipe)||"—"}</td>
+        <table><thead><tr><th>Obra</th>${MODO==="ss"?"<th>SS</th>":""}<th>Descrição</th><th>Município</th><th>Equipe</th><th class="r">Serviços</th><th class="r">Valor</th></tr></thead>
+        <tbody>${d.obras.map(o=>`<tr><td>${o.obra}</td>${MODO==="ss"?`<td>${esc(o.ss)||"—"}</td>`:""}<td>${esc(o.desc)}</td><td>${esc(o.mun)}</td><td>${esc(o.equipe)||"—"}</td>
           <td class="r">${o.itens.length}</td><td class="r"><b>${brl(o.total)}</b></td></tr>`).join("")}</tbody>
-        <tfoot><tr style="background:#eef2f7"><th colspan="4">Total</th><th class="r">${d.itens}</th><th class="r">${brl(d.total)}</th></tr></tfoot></table></div>`}`;
+        <tfoot><tr style="background:#eef2f7"><th colspan="${MODO==="ss"?5:4}">Total</th><th class="r">${d.itens}</th><th class="r">${brl(d.total)}</th></tr></tfoot></table></div>`}`;
 }
 
 document.getElementById("relFechar").onclick=()=>{document.getElementById("relmodal").hidden=true};
@@ -2048,7 +2265,7 @@ document.getElementById("relPng").onclick=()=>{
     if(tipo==="tit"){y+=24;txt(v,P,y,"#0f172a","800",21);y+=10;continue}
     if(tipo==="sub"){y+=14;txt(v,P,y,"#64748b","400",11.5);continue}
     if(tipo==="obra"){
-      y+=20; txt("Obra "+v.obra,P+12,y,"#0f172a","800",17);
+      y+=20; txt("Obra "+v.obra+(v.ss?"  ·  SS "+v.ss:""),P+12,y,"#0f172a","800",17);
       g.fillStyle="#0284c7"; g.fillRect(P,y-16,4,38);
       y+=17; txt(`${v.desc}${v.mun?" · "+v.mun:""}`,P+12,y,"#64748b","400",12);
       if(v.equipe){y+=15; txt("👷 Equipe: "+v.equipe,P+12,y,"#334155","600",12);}
