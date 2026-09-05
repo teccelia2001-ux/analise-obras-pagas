@@ -292,9 +292,12 @@ html{-webkit-text-size-adjust:100%}
       <b>📄 Adicionar nova planilha de medição</b>
       <div class="muted" style="font-size:12px">Arraste o arquivo .xls / .xlsx aqui ou clique para escolher — os dados da tela são substituídos pelos da planilha.</div>
       <div class="muted" id="fonte" style="font-size:12px;margin-top:4px"></div>
+      <div class="muted" id="listaInfo" style="font-size:12px;margin-top:4px"></div>
     </div>
     <span style="flex:1"></span>
     <button id="btnArq">Escolher arquivo</button>
+    <button class="sec" id="btnLista" title="Planilha com a lista de obras / SS que o coletor vai pesquisar no termômetro">📋 Lista a pesquisar</button>
+    <input type="file" id="arqLista" accept=".xls,.xlsx,.xlsm,.csv" hidden>
     <button class="sec" id="btnOrig" hidden>Voltar à planilha original</button>
     <button id="btnTermo">🌡️ Analisar termômetro</button>
     <button id="btnSS">🔢 Analisar SS</button>
@@ -564,6 +567,55 @@ function invSS(){ if(SS_INV) return SS_INV; SS_INV={};
   return SS_INV }
 const obraDaSS=ss=>invSS()[soDig(ss)]||"";
 function salvarMapaSS(){ SS_INV=null; try{localStorage.setItem("mapa-ss",JSON.stringify(MAPA_SS))}catch(e){} }
+
+/* ---------- lista própria de obras / SS a pesquisar no termômetro ----------
+   Sem ela, quem manda é a medição carregada. Com ela, o coletor pesquisa
+   exatamente o que está na lista — inclusive obra que ainda não foi paga. */
+let LISTA=null;
+try{const l=localStorage.getItem("lista-pesquisa"); if(l) LISTA=JSON.parse(l)}catch(e){}
+function salvarLista(){ try{ LISTA? localStorage.setItem("lista-pesquisa",JSON.stringify(LISTA))
+  : localStorage.removeItem("lista-pesquisa") }catch(e){} }
+const padObra=v=>{const d=soDig(v); return d? d.padStart(10,"0") : ""};
+/* 1793/2026 → 17932026 · 0006/2026 → 00062026 · 62026 (lido como número) → 00062026 */
+function padSS(v){
+  const t=String(v==null?"":v).trim();
+  if(t.includes("/")){ const p=t.split("/"), n=soDig(p[0]), y=soDig(p[1]);
+    if(n&&y) return n.padStart(4,"0")+y.padStart(4,"0") }
+  const d=soDig(t); return d? d.padStart(8,"0") : "";
+}
+/* diz se a célula é número de obra, número de SS, ou nada disso */
+function classificarCelula(v){
+  const t=String(v==null?"":v).trim();
+  if(!t) return null;
+  if(/^\d{1,4}\s*\/\s*\d{4}$/.test(t)) return {tipo:"ss",val:padSS(t)};
+  if(/[^\d\s.\-]/.test(t)) return null;                 /* tem letra: é texto */
+  const d=soDig(t);
+  if(!d) return null;
+  if(d.length>=9) return {tipo:"obra",val:padObra(d)};
+  if(d.length===8){
+    if(obraDaSS(d)) return {tipo:"ss",val:d};
+    return /20[1-3]\d$/.test(d) ? {tipo:"ss",val:d} : {tipo:"obra",val:padObra(d)};
+  }
+  if(d.length>=5 && /20[1-3]\d$/.test(d)) return {tipo:"ss",val:d.padStart(8,"0")};
+  return null;
+}
+/* obras que cada aba deve mostrar e o coletor deve pesquisar */
+function listaDoModo(modo){
+  if(!LISTA) return null;
+  const s=new Set();
+  if(modo==="ss"){
+    (LISTA.ss||[]).forEach(x=>s.add(obraDaSS(x)||x));
+    (LISTA.obras||[]).forEach(o=>{ if(temSS(o)) s.add(o) });
+  }else{
+    (LISTA.obras||[]).forEach(o=>{ if(!temSS(o)) s.add(o) });
+  }
+  return s.size? s : null;
+}
+function noEscopoDoModo(o,modo){
+  modo = modo==="ss" ? "ss" : (modo||MODO);
+  const L=listaDoModo(modo);
+  return L ? L.has(o) : (modo==="ss" ? temSS(o) : !temSS(o));
+}
 
 /* modo do confronto em uso: "obra" (aba ⚖️) ou "ss" (aba 🔢) */
 let MODO="obra";
@@ -838,7 +890,7 @@ function confrontoPorObra(){
     /* itens inativos não somam nos totais */
     let [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
     /* cada aba mostra só o seu universo: a 🔢 as obras com SS, a ⚖️ as demais */
-    if(MODO==="ss" ? !temSS(obra) : temSS(obra)) continue;
+    if(!noEscopoDoModo(obra,MODO)) continue;
     const acrescentado=ehAdicionado(obra,op,cod);
     if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,conf:0,inat:0,naoenc:false,itens:[]});
     const g=m.get(obra);
@@ -912,7 +964,9 @@ function renderConfronto(){
       <td>${COBRANCAS[g.obra]?`<span class="tag s-cob">💰 A cobrar</span>`:`<span class="muted">—</span>`}</td>
       <td class="num">${g.pend?brl(g.pend):"—"}</td><td class="num">${g.maior?brl(g.maior):"—"}</td>
       <td class="num">${g.sem?brl(g.sem):"—"}</td><td>${et}</td></tr>`}).join("")
-    ||`<tr><td colspan="${eSS?14:13}" class="muted" style="padding:20px">Nenhuma obra no filtro atual.</td></tr>`;
+    ||`<tr><td colspan="${eSS?14:13}" class="muted" style="padding:20px">${listaDoModo(MODO)
+      ? "Nenhuma obra desta aba foi coletada ainda — a lista “"+esc(LISTA.nome||"carregada")+"” está no comando. Rode a coleta, ou volte a usar a medição no aviso do topo."
+      : "Nenhuma obra no filtro atual."}</td></tr>`;
   document.getElementById("info").textContent=`Exibindo ${Math.min(limite,G.length)} de ${nnum(G.length)} obras`;
   document.getElementById("mais").hidden=G.length<=limite;
   atualizarBotaoInativos(true);
@@ -1686,17 +1740,23 @@ function obrasDoNovo(){
   return [...new Set(D.filter(r=>contratoDe(r.cod_mobra)==="novo").map(r=>r.num_obra))].sort();
 }
 /* obras pesquisadas no termômetro pelo próprio número (as que não têm SS) */
-function obrasNovoContrato(){ return obrasDoNovo().filter(o=>!temSS(o)) }
-/* obras da medição que o termômetro identifica pela SS */
-function obrasSS(){ return obrasDoNovo().filter(temSS) }
-/* as SS correspondentes, na mesma ordem */
-function ssParaColetar(){ return obrasSS().map(o=>soDig(ssDaObra(o))) }
+function obrasNovoContrato(){
+  const L=listaDoModo("obra");
+  return L ? [...L].sort() : obrasDoNovo().filter(o=>!temSS(o));
+}
+/* obras que o termômetro identifica pela SS */
+function obrasSS(){
+  const L=listaDoModo("ss");
+  return L ? [...L].sort() : obrasDoNovo().filter(temSS);
+}
+/* as SS correspondentes, na mesma ordem (SS solta entra por ela mesma) */
+function ssParaColetar(){ return obrasSS().map(o=>soDig(ssDaObra(o)||o)) }
 
 /* recalcula o confronto a partir do apontado coletado no termômetro */
 function calcularConfronto(apont,modo){
   modo = modo==="ss" ? "ss" : "obra";
   /* cada modo cuida do seu universo: SS de um lado, obras sem SS do outro */
-  const noEscopo = o => modo==="ss" ? temSS(o) : !temSS(o);
+  const noEscopo = o => noEscopoDoModo(o,modo);
   const pago=new Map(), unit=new Map(), desc=new Map(), mun=new Map();
   for(const r of D){
     if(contratoDe(r.cod_mobra)!=="novo") continue;
@@ -1899,10 +1959,12 @@ return "Concluido: "+OBRAS.length+" obras em "+seg+"s";
 }
 
 function abrirTermo(){
-  const n=obrasNovoContrato().length;
+  const n=obrasNovoContrato().length, daLista=!!listaDoModo("obra");
   document.getElementById("termoInfo").innerHTML = n
-    ? `A medição carregada tem <b>${n} obras do novo contrato</b> (códigos 6xxxx) para consultar no termômetro.`
-    : `<span style="color:var(--bad)">A medição carregada não tem obras do novo contrato (códigos 6xxxx) — não há o que consultar.</span>`;
+    ? (daLista
+       ? `Vou consultar as <b>${nnum(n)} obras da lista</b> “${esc(LISTA.nome||"carregada")}”. A medição entra só como o que foi <b>pago</b>.`
+       : `A medição carregada tem <b>${nnum(n)} obras do novo contrato</b> (códigos 6xxxx) para consultar no termômetro.`)
+    : `<span style="color:var(--bad)">Não há obras a consultar — carregue uma medição com obras do novo contrato (códigos 6xxxx) ou uma lista própria em “📋 Lista a pesquisar”.</span>`;
   document.getElementById("termoRes").innerHTML="";
   document.getElementById("termoCola").value="";
   document.getElementById("termomodal").hidden=false;
@@ -1947,6 +2009,65 @@ document.getElementById("termoAplicar").onclick=()=>{
 };
 
 
+/* ---------- lista de obras / SS a pesquisar (planilha separada da medição) ---------- */
+function listaResumo(){
+  const el=document.getElementById("listaInfo"); if(!el) return;
+  if(!LISTA){ el.innerHTML=""; return }
+  const nO=(LISTA.obras||[]).filter(o=>!temSS(o)).length;
+  const nS=(LISTA.ss||[]).length+(LISTA.obras||[]).filter(temSS).length;
+  el.innerHTML=`📋 Pesquisando pela lista <b>${esc(LISTA.nome||"carregada")}</b>: `+
+    `${nnum(nO)} obra(s) e ${nnum(nS)} SS — a medição entra só como o que foi <b>pago</b>. `+
+    `<a href="#" id="listaLimpar" style="color:var(--accent)">voltar a usar a medição</a>`;
+  const a=document.getElementById("listaLimpar");
+  if(a) a.onclick=ev=>{ ev.preventDefault(); LISTA=null; salvarLista();
+    invalidarConfronto(); invalidarCatalogo(); listaResumo(); render() };
+}
+function lerLista(file){
+  if(!file) return;
+  const el=document.getElementById("listaInfo");
+  el.textContent="Lendo "+file.name+"\u2026";
+  const fr=new FileReader();
+  fr.onload=ev=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{type:"array",cellDates:false});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+      if(!aoa.length) throw new Error("Planilha vazia.");
+      /* se houver cabeçalho dizendo qual coluna é obra e qual é SS, respeita;
+         senão, lê as três primeiras colunas e reconhece pelo formato do número */
+      const cab=(aoa[0]||[]).map(x=>String(x==null?"":x).trim().toLowerCase());
+      const cObra=cab.findIndex(h=>/obra/.test(h)&&!/descri|refer/.test(h));
+      const cSS=cab.findIndex(h=>/^ss\b|^ss$|solicita/.test(h));
+      const obras=new Set(), ss=new Set();
+      const usaCab = cObra>=0 || cSS>=0;
+      for(let i=usaCab?1:0;i<aoa.length;i++){
+        const L=aoa[i]||[];
+        if(usaCab){
+          if(cObra>=0){ const o=padObra(L[cObra]); if(o&&soDig(L[cObra]).length>=5) obras.add(o) }
+          if(cSS>=0){ const v=padSS(L[cSS]); if(v&&soDig(L[cSS])) ss.add(v) }
+        }else{
+          for(let c=0;c<Math.min(L.length,3);c++){
+            const r=classificarCelula(L[c]);
+            if(!r) continue;
+            (r.tipo==="ss"? ss : obras).add(r.val);
+          }
+        }
+      }
+      /* SS que já tem obra conhecida vira obra; obra com SS conhecida fica como obra */
+      for(const v of [...ss]){ const o=obraDaSS(v); if(o){ ss.delete(v); obras.add(o) } }
+      if(!obras.size&&!ss.size) throw new Error("N\u00e3o reconheci n\u00fameros de obra nem de SS nessa planilha.");
+      LISTA={nome:file.name,quando:Date.now(),obras:[...obras].sort(),ss:[...ss].sort()};
+      salvarLista(); invalidarConfronto(); invalidarCatalogo(); UNIT=null;
+      listaResumo(); render();
+    }catch(err){ el.innerHTML='<span style="color:var(--bad)">\u274c '+esc(err.message)+"</span>" }
+  };
+  fr.onerror=()=>{el.innerHTML='<span style="color:var(--bad)">\u274c N\u00e3o foi poss\u00edvel ler o arquivo.</span>'};
+  fr.readAsArrayBuffer(file);
+}
+document.getElementById("btnLista").onclick=()=>document.getElementById("arqLista").click();
+document.getElementById("arqLista").onchange=e=>{ lerLista(e.target.files[0]); e.target.value="" };
+listaResumo();
+
 /* ---------- aba SS: mesmas obras, pesquisadas no termômetro pelo número da SS ---------- */
 function irParaAba(v){
   vista=v; sortKey=null; sortDir=1; limite=200;
@@ -1966,10 +2087,12 @@ function ssMapaResumo(){
           : '<span style="color:var(--bad)">Nenhuma obra com SS cadastrada — importe a planilha obra × SS.</span>';
 }
 function abrirSS(){
-  const n=obrasSS().length;
+  const n=obrasSS().length, daLista=!!listaDoModo("ss");
   document.getElementById("ssInfo").innerHTML = n
-    ? `A medição carregada tem <b>${nnum(n)} obras identificadas por SS</b> para consultar no termômetro.`
-    : `<span style="color:var(--bad)">Nenhuma obra da medição carregada aparece na tabela obra × SS — confira a tabela abaixo ou carregue a medição certa.</span>`;
+    ? (daLista
+       ? `Vou consultar as <b>${nnum(n)} SS da lista</b> “${esc(LISTA.nome||"carregada")}”. A medição entra só como o que foi <b>pago</b>.`
+       : `A medição carregada tem <b>${nnum(n)} obras identificadas por SS</b> para consultar no termômetro.`)
+    : `<span style="color:var(--bad)">Nenhuma SS a consultar — carregue a medição com essas obras, ou uma lista própria em “📋 Lista a pesquisar”.</span>`;
   document.getElementById("ssRes").innerHTML="";
   document.getElementById("ssCola").value="";
   ssMapaResumo();
