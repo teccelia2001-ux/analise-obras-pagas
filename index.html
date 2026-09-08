@@ -50,6 +50,8 @@ button.perigo:hover{background:var(--bad);color:#fff}
 .mselPop label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:13.5px;cursor:pointer}
 .mselPop label:hover{background:var(--panel2)}
 .mselPop input{margin:0}
+.mselGr{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding:8px 8px 3px}
+.mselGr:first-child{padding-top:4px}
 .mselPe{display:flex;align-items:center;gap:8px;padding:6px 8px 2px;border-top:1px solid var(--line);margin-top:4px;font-size:11.5px}
 input,select,button{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
 input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
@@ -343,17 +345,21 @@ html{-webkit-text-size-adjust:100%}
     </select>
     <select id="fmo"><option value="">Todos os cód. mão de obra</option></select>
     <div id="fsitconf" class="msel" hidden>
-      <button type="button" class="mselBtn" id="fsitconfBtn" title="Marque quantas situações quiser — a obra entra se atender a qualquer uma das marcadas">Todas as obras do confronto <span class="cx">▾</span></button>
+      <button type="button" class="mselBtn" id="fsitconfBtn" title="Marque quantas quiser. Dentro do mesmo grupo vale qualquer uma das marcadas; entre grupos, a obra precisa atender aos dois">Todas as obras do confronto <span class="cx">▾</span></button>
       <div class="mselPop" hidden>
+        <div class="mselGr">Situação do confronto</div>
         <label><input type="checkbox" value="pend"> Com pendência de pagamento</label>
         <label><input type="checkbox" value="maior"> Com pago a mais</label>
         <label><input type="checkbox" value="sem"> Com pago sem apontamento</label>
         <label><input type="checkbox" value="nao"> Não encontradas no termômetro</label>
         <label><input type="checkbox" value="ok"> Conferidas (sem divergência)</label>
+        <div class="mselGr">Validação e cobrança</div>
         <label><input type="checkbox" value="pendval"> ⏳ Pendentes de validação</label>
         <label><input type="checkbox" value="val"> ✔️ Já validadas</label>
         <label><input type="checkbox" value="cobrar"> 💰 Marcadas para cobrança</label>
-        <div class="mselPe"><button type="button" class="mini" data-mselclear="1">Limpar seleção</button><span class="muted">a obra entra se atender a <b>qualquer</b> marcada</span></div>
+        <div class="mselGr">Excluir da lista</div>
+        <label><input type="checkbox" value="-nao"> 🚫 Esconder as não encontradas no termômetro</label>
+        <div class="mselPe"><button type="button" class="mini" data-mselclear="1">Limpar seleção</button><span class="muted">no mesmo grupo vale <b>qualquer</b> marcada; entre grupos, vale a soma</span></div>
       </div>
     </div>
     <button class="sec" id="limpar">Limpar</button>
@@ -938,14 +944,22 @@ function confrontoPorObra(){
 }
 const ROT_SITCONF={pend:"com pendência de pagamento",maior:"com pago a mais",sem:"com pago sem apontamento",
   nao:"não encontradas no termômetro",ok:"conferidas (sem divergência)",pendval:"pendentes de validação",
-  val:"já validadas",cobrar:"marcadas para cobrança"};
-/* fs vem do filtro de situações do confronto, com uma ou várias marcadas: a obra entra se atender a qualquer uma */
+  val:"já validadas",cobrar:"marcadas para cobrança","-nao":"sem as não encontradas no termômetro"};
+/* filtro de situações do confronto: dentro do mesmo grupo vale qualquer marcada (ou),
+   entre os grupos a obra precisa atender aos dois (e), e "-nao" tira as não encontradas */
+const GRUPO_SITCONF={pend:"a",maior:"a",sem:"a",nao:"a",ok:"a",pendval:"b",val:"b",cobrar:"b"};
 function passaSitConf(g,fs){
-  if(!fs) return true;
+  const ks=String(fs||"").split(",").filter(Boolean);
+  if(!ks.length) return true;
+  if(ks.includes("-nao") && g.naoenc) return false;
   const um=(k)=> k==="pend"? g.pend>0 : k==="maior"? g.maior>0 : k==="sem"? g.sem>0 :
                  k==="nao"? g.naoenc : k==="ok"? (g.div===0&&!g.naoenc) : k==="pendval"? !VALIDADAS[g.obra] :
                  k==="val"? !!VALIDADAS[g.obra] : k==="cobrar"? !!COBRANCAS[g.obra] : true;
-  return String(fs).split(",").filter(Boolean).some(um);
+  for(const gr of ["a","b"]){
+    const doGrupo=ks.filter(k=>GRUPO_SITCONF[k]===gr);
+    if(doGrupo.length && !doGrupo.some(um)) return false;
+  }
+  return true;
 }
 function renderConfronto(){
   const q=document.getElementById("q").value.trim().toLowerCase();
