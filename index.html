@@ -41,6 +41,16 @@ button.perigo:hover{background:var(--bad);color:#fff}
 .card.ok{border-color:var(--ok);background:var(--ok-bg)} .card.ok .val{color:var(--ok-txt)}
 .card.bad{border-color:var(--bad);background:var(--bad-bg)} .card.bad .val{color:var(--bad-txt)}
 .filtros{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.msel{position:relative;display:inline-block}
+.msel[hidden]{display:none}
+.mselBtn{background:var(--panel);border-color:var(--line);color:var(--txt);font-weight:500;text-align:left;min-width:250px;display:flex;align-items:center;gap:8px}
+.mselBtn .cx{margin-left:auto;color:var(--muted)}
+.msel.on .mselBtn{outline:2px solid var(--accent);outline-offset:-1px}
+.mselPop{position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:280px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.mselPop label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:13.5px;cursor:pointer}
+.mselPop label:hover{background:var(--panel2)}
+.mselPop input{margin:0}
+.mselPe{display:flex;align-items:center;gap:8px;padding:6px 8px 2px;border-top:1px solid var(--line);margin-top:4px;font-size:11.5px}
 input,select,button{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
 input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 button{cursor:pointer;background:var(--btn);border-color:var(--btn);color:#fff;font-weight:600}
@@ -329,17 +339,20 @@ html{-webkit-text-size-adjust:100%}
       <option value="novo">Novo contrato (cód. 5 díg., 6xxxx)</option>
     </select>
     <select id="fmo"><option value="">Todos os cód. mão de obra</option></select>
-    <select id="fsitconf" hidden>
-      <option value="">Todas as obras do confronto</option>
-      <option value="pend">Com pendência de pagamento</option>
-      <option value="maior">Com pago a mais</option>
-      <option value="sem">Com pago sem apontamento</option>
-      <option value="nao">Não encontradas no termômetro</option>
-      <option value="ok">Conferidas (sem divergência)</option>
-      <option value="pendval">⏳ Pendentes de validação</option>
-      <option value="val">✔️ Já validadas</option>
-      <option value="cobrar">💰 Marcadas para cobrança</option>
-    </select>
+    <div id="fsitconf" class="msel" hidden>
+      <button type="button" class="mselBtn" id="fsitconfBtn" title="Marque quantas situações quiser — a obra entra se atender a qualquer uma das marcadas">Todas as obras do confronto <span class="cx">▾</span></button>
+      <div class="mselPop" hidden>
+        <label><input type="checkbox" value="pend"> Com pendência de pagamento</label>
+        <label><input type="checkbox" value="maior"> Com pago a mais</label>
+        <label><input type="checkbox" value="sem"> Com pago sem apontamento</label>
+        <label><input type="checkbox" value="nao"> Não encontradas no termômetro</label>
+        <label><input type="checkbox" value="ok"> Conferidas (sem divergência)</label>
+        <label><input type="checkbox" value="pendval"> ⏳ Pendentes de validação</label>
+        <label><input type="checkbox" value="val"> ✔️ Já validadas</label>
+        <label><input type="checkbox" value="cobrar"> 💰 Marcadas para cobrança</label>
+        <div class="mselPe"><button type="button" class="mini" data-mselclear="1">Limpar seleção</button><span class="muted">a obra entra se atender a <b>qualquer</b> marcada</span></div>
+      </div>
+    </div>
     <button class="sec" id="limpar">Limpar</button>
     <button id="csv">Exportar CSV</button>
     <button id="xlsx">⬇️ Baixar Excel filtrado</button>
@@ -920,14 +933,24 @@ function confrontoPorObra(){
   CONF_CACHE=[...m.values()];
   return CONF_CACHE;
 }
+const ROT_SITCONF={pend:"com pendência de pagamento",maior:"com pago a mais",sem:"com pago sem apontamento",
+  nao:"não encontradas no termômetro",ok:"conferidas (sem divergência)",pendval:"pendentes de validação",
+  val:"já validadas",cobrar:"marcadas para cobrança"};
+/* fs vem do filtro de situações do confronto, com uma ou várias marcadas: a obra entra se atender a qualquer uma */
+function passaSitConf(g,fs){
+  if(!fs) return true;
+  const um=(k)=> k==="pend"? g.pend>0 : k==="maior"? g.maior>0 : k==="sem"? g.sem>0 :
+                 k==="nao"? g.naoenc : k==="ok"? (g.div===0&&!g.naoenc) : k==="pendval"? !VALIDADAS[g.obra] :
+                 k==="val"? !!VALIDADAS[g.obra] : k==="cobrar"? !!COBRANCAS[g.obra] : true;
+  return String(fs).split(",").filter(Boolean).some(um);
+}
 function renderConfronto(){
   const q=document.getElementById("q").value.trim().toLowerCase();
   const mun=document.getElementById("fmun").value;
   const fs=document.getElementById("fsitconf").value;
   let G=confrontoPorObra().filter(g=>
     (!mun||g.mun===mun)&&(!q||(g.obra+" "+g.mun).toLowerCase().includes(q))&&
-    (!fs || (fs==="pend"? g.pend>0 : fs==="maior"? g.maior>0 : fs==="sem"? g.sem>0 :
-             fs==="nao"? g.naoenc : fs==="ok"? (g.div===0&&!g.naoenc) : fs==="pendval"? !VALIDADAS[g.obra] : fs==="val"? !!VALIDADAS[g.obra] : fs==="cobrar"? !!COBRANCAS[g.obra] : true)));
+    passaSitConf(g,fs));
   G.sort((a,b)=> sortKey==="pend" ? (a.pend-b.pend)*sortDir : (b.pend-a.pend)||(b.maior+b.sem-a.maior-a.sem));
 
   const soma=k=>G.reduce((a,g)=>a+g[k],0);
@@ -1233,8 +1256,30 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
     "Abrange o <b>novo contrato</b> (códigos 6xxxx), sem as obras identificadas por SS — essas ficam na aba 🔢.";
   render();
 });
+/* filtro de situação do confronto: várias opções marcadas ao mesmo tempo (a obra entra se atender a qualquer uma) */
+(function(){
+  const box=document.getElementById("fsitconf"), btn=document.getElementById("fsitconfBtn"), pop=box.querySelector(".mselPop");
+  const cxs=()=>[...pop.querySelectorAll("input[type=checkbox]")];
+  const rotulo=cx=>cx.parentElement.textContent.trim();
+  function pintar(){
+    const m=cxs().filter(c=>c.checked);
+    btn.innerHTML=(m.length===0?"Todas as obras do confronto"
+      :m.length===1?esc(rotulo(m[0]))
+      :`${m.length} situações marcadas`)+' <span class="cx">▾</span>';
+    box.classList.toggle("on",m.length>0);
+  }
+  Object.defineProperty(box,"value",{
+    get(){ return cxs().filter(c=>c.checked).map(c=>c.value).join(",") },
+    set(v){ const s=String(v||"").split(",").filter(Boolean); cxs().forEach(c=>c.checked=s.includes(c.value)); pintar() }
+  });
+  btn.onclick=()=>{ pop.hidden=!pop.hidden };
+  pop.addEventListener("change",pintar);
+  pop.querySelector("[data-mselclear]").onclick=()=>{ box.value=""; limite=200; render() };
+  document.addEventListener("click",e=>{ if(!box.contains(e.target)) pop.hidden=true });
+  pintar();
+})();
 ["q","fmun","fsit","fmo","fcon","fsitconf"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{limite=200;render()}));
-document.getElementById("limpar").onclick=()=>{["q","fmun","fsit","fmo","fcon"].forEach(id=>document.getElementById(id).value="");limite=200;render()};
+document.getElementById("limpar").onclick=()=>{["q","fmun","fsit","fmo","fcon","fsitconf"].forEach(id=>document.getElementById(id).value="");limite=200;render()};
 document.getElementById("mais").onclick=()=>{limite+=500;render()};
 /* Excel filtrado — mesmas colunas, células e formatos da planilha de origem */
 document.getElementById("xlsx").onclick=()=>{
@@ -2413,8 +2458,7 @@ function relDados(){
   const mun=document.getElementById("fmun").value, fs=document.getElementById("fsitconf").value;
   const obras=confrontoPorObra().filter(g=> relObra ? g.obra===relObra :
     (!mun||g.mun===mun)&&(!q||(g.obra+" "+g.mun).toLowerCase().includes(q))&&
-    (!fs || (fs==="pend"? g.pend>0 : fs==="maior"? g.maior>0 : fs==="sem"? g.sem>0 :
-             fs==="nao"? g.naoenc : fs==="ok"? (g.div===0&&!g.naoenc) : fs==="pendval"? !VALIDADAS[g.obra] : fs==="val"? !!VALIDADAS[g.obra] : fs==="cobrar"? !!COBRANCAS[g.obra] : true)));
+    passaSitConf(g,fs));
   const out=[];
   for(const g of obras){
     const itens=g.itens.filter(x=>!x.inativo&&sits.includes(x.sit));
@@ -2448,6 +2492,8 @@ function relCabecalho(){
   const f=[], mun=document.getElementById("fmun").value, q=document.getElementById("q").value.trim();
   if(mun) f.push("Município: "+mun);
   if(q) f.push('Busca: "'+q+'"');
+  const fsc=document.getElementById("fsitconf").value;
+  if(fsc && !relObra) f.push("Situações: "+fsc.split(",").map(k=>ROT_SITCONF[k]||k).join(" / "));
   if(INATIVOS.size) f.push(INATIVOS.size+" serviço(s) fora da análise");
   const ss = relObra ? ssDaObra(relObra) : "";
   return {titulo: relObra ? ("Confronto da obra "+relObra+(ss?" · SS "+ss:""))
