@@ -59,6 +59,9 @@ button:hover{filter:brightness(1.08)}
 table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:10px;overflow:hidden}
 th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}
 th{background:var(--head);position:sticky;top:0;cursor:pointer;white-space:nowrap;font-size:12px}
+/* o overflow:hidden da tabela virava o "scrollport" do cabeçalho e anulava o sticky — na tabela rolável quem arredonda é o .scroll */
+.scroll table{overflow:visible}
+.scroll thead th{z-index:3;box-shadow:inset 0 -1px 0 var(--line)}
 th.num,td.num{text-align:right}
 tbody tr:nth-child(even){background:var(--panel2)}
 tbody tr:hover{background:var(--head)}
