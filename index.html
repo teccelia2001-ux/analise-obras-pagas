@@ -150,6 +150,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 #mbody{padding:16px}
 .fhead{border-left:4px solid var(--accent);padding-left:12px;margin-bottom:6px}
 .fnum{font-size:21px;font-weight:800}
+.fss{font-size:15px;font-weight:700;color:var(--muted)}
 .fdesc{color:var(--muted);margin-top:2px}
 .secao{margin-top:18px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .secao>.stitulo{display:flex;align-items:center;gap:10px;padding:10px 14px;font-weight:800;font-size:14px;letter-spacing:.3px}
@@ -1027,7 +1028,7 @@ function desenharFichaConfronto(){
   const conferidos=g.itens.filter(x=>x.sit==="Conferido").length;
   document.getElementById("mbody").innerHTML=`
     <div class="fhead"><div>
-      <div class="fnum">Obra ${num}</div>
+      <div class="fnum">Obra ${num}${ssDaObra(num)?` <span class="fss">· SS ${esc(ssDaObra(num))}</span>`:""}</div>
       <div class="fdesc">${esc(m.desc||"")}${g.mun?" · "+esc(g.mun):""}</div>
       ${obrasSuspeitas().has(num)?`<div class="avisoSusp">⚠️ <b>Coleta a conferir:</b> o apontamento desta obra é idêntico ao de outra obra, o que indica que a busca no termômetro devolveu o resultado errado. Confira no termômetro antes de usar estes números — inclusive a equipe.</div>`:""}
       ${(EQ()[num]||{}).equipe?`<div class="fdesc" style="margin-top:2px">👷 Equipe: <b>${esc(EQ()[num].equipe)}</b>${EQ()[num].data?` · última atualização no termômetro em ${esc(EQ()[num].data)}`:""}</div>`:""}
