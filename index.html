@@ -90,6 +90,15 @@ button.cobrar{background:#ca8a04;border-color:#ca8a04}
 .card.cob{border-color:#eab308} .card.cob .val{color:#eab308}
 .tagSusp{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
   background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid #f59e0b}
+.s-and{background:rgba(56,189,248,.18);color:#38bdf8;border-color:#38bdf8}
+[data-tema="claro"] .s-and{background:#e0f2fe;color:#0369a1;border-color:#0ea5e9}
+button.andamento{background:#0284c7;border-color:#0284c7}
+.tagAnd{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
+  background:rgba(56,189,248,.18);color:#38bdf8;border:1px solid #38bdf8;vertical-align:middle}
+[data-tema="claro"] .tagAnd{background:#e0f2fe;color:#0369a1;border-color:#0ea5e9}
+/* aviso de obra em andamento dentro do relatorio impresso/PNG */
+.rand{margin:6px 0 2px;padding:7px 10px;border-radius:8px;border:1px solid #0ea5e9;
+  background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700}
 .avisoSusp{margin-top:8px;padding:9px 11px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.12);
   border-radius:8px;font-size:12.5px;line-height:1.5}
 .tagLV{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
@@ -100,6 +109,15 @@ button.cobrar{background:#ca8a04;border-color:#ca8a04}
 .card.cob{border-color:#eab308} .card.cob .val{color:#eab308}
 .tagSusp{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
   background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid #f59e0b}
+.s-and{background:rgba(56,189,248,.18);color:#38bdf8;border-color:#38bdf8}
+[data-tema="claro"] .s-and{background:#e0f2fe;color:#0369a1;border-color:#0ea5e9}
+button.andamento{background:#0284c7;border-color:#0284c7}
+.tagAnd{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
+  background:rgba(56,189,248,.18);color:#38bdf8;border:1px solid #38bdf8;vertical-align:middle}
+[data-tema="claro"] .tagAnd{background:#e0f2fe;color:#0369a1;border-color:#0ea5e9}
+/* aviso de obra em andamento dentro do relatorio impresso/PNG */
+.rand{margin:6px 0 2px;padding:7px 10px;border-radius:8px;border:1px solid #0ea5e9;
+  background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700}
 .avisoSusp{margin-top:8px;padding:9px 11px;border-left:3px solid #f59e0b;background:rgba(245,158,11,.12);
   border-radius:8px;font-size:12.5px;line-height:1.5}
 .tagLV{background:#fef9c3;color:#a16207;border-color:#eab308}
@@ -534,6 +552,7 @@ html{-webkit-text-size-adjust:100%}
       <span style="flex:1"></span>
       <button id="btnValidar" hidden></button>
       <button id="btnCobrar" hidden></button>
+      <button id="btnAndamento" hidden></button>
       <button class="sec" id="relobra" hidden>📄 Relatório desta obra</button>
       <button class="sec" id="csvobra">CSV desta obra</button>
       <button class="sec" id="imprimir">Imprimir</button>
@@ -999,7 +1018,7 @@ function renderConfronto(){
              : `<span class="tag s-ok">Conferida</span>`;
     const temLV=g.itens.some(x=>ehLV(x.serv));
     const susp=obrasSuspeitas().has(g.obra);
-    return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}</td>
+    return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}${ANDAMENTO[g.obra]?' <span class="tagAnd" title="Obra em andamento — ainda em execução">🚧 em andamento</span>':""}</td>
       ${eSS?`<td><b>${esc(ssDaObra(g.obra)||"—")}</b></td>`:""}
       <td class="trunc" title="${esc(desc)}">${esc(desc)||"—"}</td><td>${esc(g.mun)}</td>
       <td>${(EQ()[g.obra]||{}).equipe? esc(EQ()[g.obra].equipe) : '<span class="muted">—</span>'}${susp?' <span class="tagSusp" title="Apontamento idêntico ao de outra obra — confira no termômetro">⚠️ conferir</span>':""}</td>
@@ -1075,7 +1094,7 @@ function desenharFichaConfronto(){
       <div class="fdesc">${esc(m.desc||"")}${g.mun?" · "+esc(g.mun):""}</div>
       ${obrasSuspeitas().has(num)?`<div class="avisoSusp">⚠️ <b>Coleta a conferir:</b> o apontamento desta obra é idêntico ao de outra obra, o que indica que a busca no termômetro devolveu o resultado errado. Confira no termômetro antes de usar estes números — inclusive a equipe.</div>`:""}
       ${(EQ()[num]||{}).equipe?`<div class="fdesc" style="margin-top:2px">👷 Equipe: <b>${esc(EQ()[num].equipe)}</b>${EQ()[num].data?` · última atualização no termômetro em ${esc(EQ()[num].data)}`:""}</div>`:""}
-      <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}</div>
+      <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}${ANDAMENTO[num]?`<span class="tag s-and">🚧 Em andamento</span>`:""}</div>
     </div></div>
     ${naoenc}
     <div class="secao add">
@@ -1183,7 +1202,8 @@ function abrirFicha(num,tipo){
   document.getElementById("relobra").hidden = fichaTipo!=="conf";
   document.getElementById("btnValidar").hidden = fichaTipo!=="conf";
   document.getElementById("btnCobrar").hidden = fichaTipo!=="conf";
-  if(fichaTipo==="conf"){ atualizarBotaoValidar(num); atualizarBotaoCobrar(num); }
+  document.getElementById("btnAndamento").hidden = fichaTipo!=="conf";
+  if(fichaTipo==="conf"){ atualizarBotaoValidar(num); atualizarBotaoCobrar(num); atualizarBotaoAndamento(num); }
   (fichaTipo==="conf"?desenharFichaConfronto:desenharFicha)();
   document.getElementById("modal").hidden=false; document.body.style.overflow="hidden";
 }
@@ -1237,6 +1257,7 @@ document.getElementById("imprimir").onclick=()=>window.print();
 document.getElementById("relobra").onclick=()=>abrirRelatorio(fichaObra);
 document.getElementById("btnValidar").onclick=()=>validarObra(fichaObra);
 document.getElementById("btnCobrar").onclick=()=>marcarCobranca(fichaObra);
+document.getElementById("btnAndamento").onclick=()=>marcarAndamento(fichaObra);
 document.getElementById("csvobra").onclick=()=>{
   if(fichaTipo==="conf"){
     const g=confrontoPorObra().find(x=>x.obra===fichaObra); if(!g)return;
@@ -1637,6 +1658,30 @@ function validarObra(obra){
   if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
 }
 
+/* ---------- obras em andamento ----------
+
+   Obra em andamento nao esta errada: ela ainda nao acabou. Sem essa marca o
+   relatorio de uma obra em execucao chega ao cliente com pendencias que ainda
+   vao ser pagas, e alguem gasta o dia conferindo o que nao precisava. */
+let ANDAMENTO={};
+try{const a=localStorage.getItem("confronto-andamento"); if(a) ANDAMENTO=JSON.parse(a)}catch(e){}
+function salvarAndamento(){try{localStorage.setItem("confronto-andamento",JSON.stringify(ANDAMENTO))}catch(e){}}
+function atualizarBotaoAndamento(obra){
+  const b=document.getElementById("btnAndamento"); if(!b) return;
+  const a=ANDAMENTO[obra];
+  b.textContent = a ? `\u{1F6A7} Em andamento desde ${a.em} \u2014 concluir` : "\u{1F6A7} Marcar como em andamento";
+  b.className = a ? "sec" : "andamento";
+}
+function marcarAndamento(obra){
+  if(ANDAMENTO[obra]) delete ANDAMENTO[obra];
+  else ANDAMENTO[obra]={em:new Date().toLocaleString("pt-BR")};
+  salvarAndamento(); invalidarConfronto();
+  atualizarBotaoAndamento(obra);
+  if(fichaObra===obra&&fichaTipo==="conf") desenharFichaConfronto();
+  render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
+
 /* ---------- obras marcadas para cobrança ---------- */
 let COBRANCAS={};
 try{const c=localStorage.getItem("confronto-cobrancas"); if(c) COBRANCAS=JSON.parse(c)}catch(e){}
@@ -1682,7 +1727,7 @@ function gravarAnalise(id,nome,silencioso){
   const base={id,nome,quando:new Date().toISOString(),
     arquivo:(FONTE&&FONTE.nome)||"", aba:(FONTE&&FONTE.aba)||"", datas:(FONTE&&FONTE.datas)||[],
     confronto:CONFRONTO, equipes:EQUIPES, confrontoSS:CONFRONTO_SS, equipesSS:EQUIPES_SS, mapaSS:MAPA_SS, edicoes:EDICOES,
-    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, resumo:resumoAtual()};
+    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, andamento:ANDAMENTO, resumo:resumoAtual()};
   const aviso=t=>{const el=document.getElementById("fonte"); if(el&&!silencioso) el.innerHTML=t};
   let completa=true;
   try{ localStorage.setItem("analise:"+id, JSON.stringify(Object.assign({},base,{aoa:(FONTE&&FONTE.aoa)||null}))); }
@@ -1715,6 +1760,7 @@ function abrirAnalise(id){
   ADICIONADOS=a.adicionados||{}; salvarAdicionados(); invalidarCatalogo();
   VALIDADAS=a.validadas||{}; salvarValidadas();
   COBRANCAS=a.cobrancas||{}; salvarCobrancas();
+  ANDAMENTO=a.andamento||{}; salvarAndamento();
   ANALISE_ATUAL={id:a.id,nome:a.nome}; MODO="obra"; invalidarConfronto(); invalidarCatalogo(); salvarRascunho();
   const el=document.getElementById("fonte");
   if(el) el.innerHTML=`📂 <b>${esc(a.nome)}</b> — salva em ${new Date(a.quando).toLocaleString("pt-BR")}`+
@@ -2489,11 +2535,15 @@ function relDados(){
       return {sit,itens:its,total:its.reduce((a,x)=>a+relVal(x),0),
               inst:its.filter(x=>x.op==="I").length, retir:its.filter(x=>x.op==="R").length};
     }).filter(s=>s.itens.length);
-    out.push({obra:g.obra,ss:ssDaObra(g.obra),mun:g.mun,desc:(META[g.obra]||{}).desc||"",equipe:(EQ()[g.obra]||{}).equipe||"",secoes,itens,
+    out.push({obra:g.obra,ss:ssDaObra(g.obra),andamento:!!ANDAMENTO[g.obra],mun:g.mun,desc:(META[g.obra]||{}).desc||"",equipe:(EQ()[g.obra]||{}).equipe||"",secoes,itens,
       pend:g.pend, naoenc:g.naoenc, inat:g.inat||0,
       total:itens.reduce((a,x)=>a+relVal(x),0)});
   }
-  out.sort((a,b)=>b.total-a.total);
+  /* As obras EM ANDAMENTO vao para o inicio, juntas e em sequencia: quem le o
+     relatorio ve primeiro o que ainda esta em execucao e nao confunde pendencia
+     de obra viva com pendencia de obra fechada. Dentro de cada grupo continua
+     valendo a ordem de sempre, do maior valor para o menor. */
+  out.sort((a,b)=>(b.andamento-a.andamento)||(b.total-a.total));
   return {obras:out,sits,det,
     total:out.reduce((a,o)=>a+o.total,0),
     itens:out.reduce((a,o)=>a+o.itens.length,0),
@@ -2517,7 +2567,13 @@ function relCabecalho(){
   const ss = relObra ? ssDaObra(relObra) : "";
   return {titulo: relObra ? ("Confronto da obra "+relObra+(ss?" · SS "+ss:""))
                           : ("Confronto apontado × pago — "+(MODO==="ss"?"obras por SS":"novo contrato")),
-    sub:"",
+    /* A unica linha de subtitulo que sobrou no relatorio: so aparece quando
+       ha algo que muda a leitura dos numeros. Obra em andamento e exatamente
+       isso — as pendencias ainda podem ser pagas. */
+    sub: (relObra && ANDAMENTO[relObra])
+           ? "\u{1F6A7} OBRA EM ANDAMENTO em " + ANDAMENTO[relObra].em +
+             " \u2014 ainda em execu\u00e7\u00e3o: os valores pendentes podem ainda ser pagos."
+           : "",
     filtros:f.join(" · ")};
 }
 
@@ -2544,7 +2600,7 @@ function relHTML(){
   const soUmaObra = !!relObra;
   const obra=(o)=>`${soUmaObra?"":`<div class="robl">
     <div class="robra">
-      <div class="rnum">Obra ${o.obra}${o.ss?` · SS ${o.ss}`:""}</div>
+      <div class="rnum">Obra ${o.obra}${o.ss?` · SS ${o.ss}`:""}${o.andamento?` 🚧 EM ANDAMENTO`:""}</div>
       <div class="rdesc">${esc(o.desc)}${o.mun?" · "+esc(o.mun):""}</div>
       ${o.equipe?`<div class="rdesc">Equipe: <b>${esc(o.equipe)}</b></div>`:""}
       <div class="rtags"><span class="rtag" style="background:#f3e8ff;color:#7e22ce;border-color:#a855f7">Novo contrato</span>
@@ -2559,7 +2615,7 @@ function relHTML(){
   const o1 = soUmaObra ? d.obras[0] : null;
   return `<div class="rhead"><h1>${c.titulo}</h1>
       ${o1?`<div class="sub">${esc(o1.desc)}${o1.mun?" · "+esc(o1.mun):""}${o1.equipe?" · Equipe: "+esc(o1.equipe):""}</div>`:""}
-      ${c.sub?`<div class="sub">${c.sub}</div>`:""}${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
+      ${c.sub?`<div class="${relObra&&ANDAMENTO[relObra]?"rand":"sub"}">${c.sub}</div>`:""}${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
     <div class="rsec${soUmaObra?"":" rquebra"}" style="border-color:#334155">
       <div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
         <span>Resumo</span><span class="rcont">${d.obras.length} obras · ${d.itens} serviços</span>
@@ -2572,7 +2628,7 @@ function relHTML(){
       : `<div class="rsec" style="border-color:#334155"><div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
           <span>Totais por obra</span><span class="rcont">${d.obras.length} obras</span><span class="rtot">${brl(d.total)}</span></div>
         <table><thead><tr><th>Obra</th>${MODO==="ss"?"<th>SS</th>":""}<th>Descrição</th><th>Município</th><th>Equipe</th><th class="r">Serviços</th><th class="r">Valor</th></tr></thead>
-        <tbody>${d.obras.map(o=>`<tr><td>${o.obra}</td>${MODO==="ss"?`<td>${esc(o.ss)||"—"}</td>`:""}<td>${esc(o.desc)}</td><td>${esc(o.mun)}</td><td>${esc(o.equipe)||"—"}</td>
+        <tbody>${d.obras.map(o=>`<tr><td>${o.obra}${o.andamento?" 🚧":""}</td>${MODO==="ss"?`<td>${esc(o.ss)||"—"}</td>`:""}<td>${esc(o.desc)}</td><td>${esc(o.mun)}</td><td>${esc(o.equipe)||"—"}</td>
           <td class="r">${o.itens.length}</td><td class="r"><b>${brl(o.total)}</b></td></tr>`).join("")}</tbody>
         <tfoot><tr style="background:#eef2f7"><th colspan="${MODO==="ss"?5:4}">Total</th><th class="r">${d.itens}</th><th class="r">${brl(d.total)}</th></tr></tfoot></table></div>`}`;
 }
@@ -2658,9 +2714,9 @@ document.getElementById("relPng").onclick=()=>{
     const [tipo,v]=e;
     if(tipo==="esp"){y+=v;continue}
     if(tipo==="tit"){y+=24;txt(v,P,y,"#0f172a","800",21);y+=10;continue}
-    if(tipo==="sub"){y+=14;txt(v,P,y,"#64748b","400",11.5);continue}
+    if(tipo==="sub"){y+=14;/* o aviso de obra em andamento nao pode sair cinza como um subtitulo qualquer */const and=String(v).startsWith("🚧");txt(v,P,y,and?"#0369a1":"#64748b",and?"800":"400",and?13:11.5);continue}
     if(tipo==="obra"){
-      y+=20; txt("Obra "+v.obra+(v.ss?"  ·  SS "+v.ss:""),P+12,y,"#0f172a","800",17);
+      y+=20; txt("Obra "+v.obra+(v.ss?"  ·  SS "+v.ss:"")+(v.andamento?"   🚧 EM ANDAMENTO":""),P+12,y,"#0f172a","800",17);
       g.fillStyle="#0284c7"; g.fillRect(P,y-16,4,38);
       y+=17; txt(`${v.desc}${v.mun?" · "+v.mun:""}`,P+12,y,"#64748b","400",12);
       if(v.equipe){y+=15; txt("👷 Equipe: "+v.equipe,P+12,y,"#334155","600",12);}
@@ -2718,7 +2774,7 @@ document.getElementById("relPng").onclick=()=>{
     }
     if(tipo==="obral"){
       y+=L; if(zebra){g.fillStyle="#f8fafc";g.fillRect(P,y-14,W-2*P,L)} zebra=!zebra;
-      txt(v.obra,X.cod,y,"#0f172a","600",11.5); txt(corta(v.desc,W-900),P+120,y,"#334155","400",11.5);
+      txt(v.obra+(v.andamento?" 🚧":""),X.cod,y,"#0f172a","600",11.5); txt(corta(v.desc,W-900),P+120,y,"#334155","400",11.5);
       txt(v.mun,W-760,y,"#334155","400",11.5); txt(v.equipe||"—",W-580,y,"#334155","400",11.5); txt(v.itens.length,X.dif,y,"#334155","400",11.5,"right");
       txt(brl(v.total),X.valor,y,"#0f172a","700",11.5,"right"); continue;
     }
