@@ -507,7 +507,7 @@ html{-webkit-text-size-adjust:100%}
       <p class="muted" style="margin-top:0;font-size:12.5px">Marque o que deve aparecer no relatório. Ele respeita os filtros atuais e ignora os serviços que estão fora da análise.</p>
       <div id="relOpcoes">
         <label><input type="checkbox" value="Pendente de pagamento" checked> 🔴 Pendente de pagamento</label>
-        <label><input type="checkbox" value="Pagamento parcial" checked> 🟠 Pagamento parcial</label>
+        <label><input type="checkbox" value="Pagamento parcial" checked> 🟠 Divergência</label>
         <label><input type="checkbox" value="Pago a mais"> 🟣 Pago a mais</label>
         <label><input type="checkbox" value="Pago sem apontamento"> 🔵 Pago sem apontamento</label>
         <label><input type="checkbox" value="Obra não encontrada no termômetro"> ⚠️ Obras não encontradas no termômetro</label>
@@ -751,6 +751,7 @@ document.getElementById("tbl").tHead.addEventListener("click",e=>{
   sortDir = sortKey===k ? -sortDir : 1; sortKey=k; render();
 });
 /* ---------- confronto apontado (termômetro) x pago (medição) ---------- */
+const rotSit=s=>s==="Pagamento parcial"?"Divergência":s;
 const SIT_CLS={"Pendente de pagamento":"s-pend","Pagamento parcial":"s-parc","Pago a mais":"s-maior",
   "Pago sem apontamento":"s-sem","Conferido":"s-ok","Obra não encontrada no termômetro":"s-nao"};
 let EDICOES={};
@@ -1095,7 +1096,7 @@ function desenharFichaConfronto(){
       </div>`:""}
     </div>
     ${bloco("Pendente de pagamento","pend","🔴",x=>x.sit==="Pendente de pagamento")}
-    ${bloco("Pagamento parcial","parc","🟠",x=>x.sit==="Pagamento parcial")}
+    ${bloco("Divergência","parc","🟠",x=>x.sit==="Pagamento parcial")}
     ${bloco("Pago a mais","mais","🟣",x=>x.sit==="Pago a mais")}
     ${bloco("Pago sem apontamento","sem","🔵",x=>x.sit==="Pago sem apontamento")}
     ${bloco("Serviços não encontrados no termômetro","nao","⚠️",x=>x.sit==="Obra não encontrada no termômetro")}
@@ -1242,7 +1243,7 @@ document.getElementById("csvobra").onclick=()=>{
     const L=["num_obra;operacao;cod_mobra;servico;qtd_apontada;qtd_paga;diferenca;valor_diferenca;situacao"]
       .concat(g.itens.map(x=>[fichaObra,x.op==="I"?"Instalado":"Retirado",x.cod,`"${x.serv}"`,
         String(x.qa).replace(".",","),String(x.qp).replace(".",","),String(x.dif).replace(".",","),
-        String(x.vdif).replace(".",","),`"${x.sit}"`].join(";")));
+        String(x.vdif).replace(".",","),`"${rotSit(x.sit)}"`].join(";")));
     const a=document.createElement("a");
     a.href=URL.createObjectURL(new Blob(["﻿"+L.join(SEP)],{type:"text/csv;charset=utf-8"}));
     a.download=`confronto-obra-${arqObra(fichaObra)}.csv`; a.click(); return;
@@ -2527,7 +2528,7 @@ function relHTML(){
     const t=SIT_TEMA[s.sit];
     return `<div class="rsec" style="border-color:${t.bar}">
       <div class="rsectit" style="background:${t.bg};color:${t.txt};border-bottom:2px solid ${t.bar}">
-        <span>${t.ico} ${s.sit}</span>
+        <span>${t.ico} ${rotSit(s.sit)}</span>
         <span class="rcont">${s.itens.length} serviços · ${s.inst} inst. / ${s.retir} retir.</span>
         <span class="rtot">${brl(s.total)}</span></div>
       <table><thead><tr><th>Código</th><th>Op.</th><th>Serviço</th>
@@ -2536,7 +2537,7 @@ function relHTML(){
         <td class="${x.op==="I"?"opi":"opr"}">${x.op==="I"?"▲ Inst.":"▼ Retir."}</td>
         <td>${esc(x.serv)}</td><td class="r">${nnum(x.qa)}</td><td class="r">${nnum(x.qp)}</td>
         <td class="r">${nnum(x.dif)}</td><td class="r"><b>${brl(Math.abs(x.vdif))}</b></td></tr>`).join("")}</tbody>
-      <tfoot><tr style="background:${t.bg};color:${t.txt}"><th colspan="6">${s.sit} — total</th>
+      <tfoot><tr style="background:${t.bg};color:${t.txt}"><th colspan="6">${rotSit(s.sit)} — total</th>
         <th class="r">${brl(s.total)}</th></tr></tfoot></table></div>`;
   };
   /* no relatório de uma obra só, o cabeçalho dela aparece uma única vez, no topo */
@@ -2564,7 +2565,7 @@ function relHTML(){
         <span>Resumo</span><span class="rcont">${d.obras.length} obras · ${d.itens} serviços</span>
         <span class="rtot">${brl(d.total)}</span></div>
       <table><thead><tr><th>Situação</th><th class="r">Serviços</th><th class="r">Valor</th></tr></thead>
-      <tbody>${d.porSit.map(x=>`<tr><td style="color:${SIT_TEMA[x.sit].txt};font-weight:600">${SIT_TEMA[x.sit].ico} ${x.sit}</td>
+      <tbody>${d.porSit.map(x=>`<tr><td style="color:${SIT_TEMA[x.sit].txt};font-weight:600">${SIT_TEMA[x.sit].ico} ${rotSit(x.sit)}</td>
         <td class="r">${x.n}</td><td class="r"><b>${brl(x.v)}</b></td></tr>`).join("")}</tbody>
       <tfoot><tr style="background:#eef2f7"><th>Total</th><th class="r">${d.itens}</th><th class="r">${brl(d.total)}</th></tr></tfoot></table></div>
     ${d.det ? d.obras.map(obra).join("")
@@ -2628,7 +2629,7 @@ document.getElementById("relPng").onclick=()=>{
       if(!relObra) el.push(["obra",o]);
       o.secoes.forEach(s=>{
         el.push(["esp",6]);
-        el.push(["sec",{sit:s.sit,rot:s.sit,cont:`${s.itens.length} serviços · ${s.inst} inst. / ${s.retir} retir.`,total:s.total,tema:SIT_TEMA[s.sit]}]);
+        el.push(["sec",{sit:s.sit,rot:rotSit(s.sit),cont:`${s.itens.length} serviços · ${s.inst} inst. / ${s.retir} retir.`,total:s.total,tema:SIT_TEMA[s.sit]}]);
         el.push(["cab"]);
         s.itens.forEach(x=>el.push(["item",x]));
         el.push(["fim",s]);
@@ -2695,7 +2696,7 @@ document.getElementById("relPng").onclick=()=>{
     if(tipo==="res"){
       y+=L; if(zebra){g.fillStyle="#f8fafc";g.fillRect(P,y-14,W-2*P,L)} zebra=!zebra;
       const t=SIT_TEMA[v.sit];
-      txt(`${t.ico} ${v.sit}`,X.cod,y,t.txt,"600",12);
+      txt(`${t.ico} ${rotSit(v.sit)}`,X.cod,y,t.txt,"600",12);
       txt(v.n,X.dif,y,"#334155","400",12,"right"); txt(brl(v.v),X.valor,y,"#0f172a","700",12,"right");
       continue;
     }
@@ -2707,7 +2708,7 @@ document.getElementById("relPng").onclick=()=>{
     }
     if(tipo==="fim"){
       y+=L; const t=SIT_TEMA[v.sit]; g.fillStyle=t.bg; g.fillRect(P,y-14,W-2*P,L);
-      txt(v.sit+" — total",X.cod,y,t.txt,"700",12); txt(brl(v.total),X.valor,y,t.txt,"800",12,"right");
+      txt(rotSit(v.sit)+" — total",X.cod,y,t.txt,"700",12); txt(brl(v.total),X.valor,y,t.txt,"800",12,"right");
       continue;
     }
     if(tipo==="totobra"){
