@@ -2513,12 +2513,10 @@ function relCabecalho(){
   if(q) f.push('Busca: "'+q+'"');
   const fsc=document.getElementById("fsitconf").value;
   if(fsc && !relObra) f.push("Situações: "+fsc.split(",").map(k=>ROT_SITCONF[k]||k).join(" / "));
-  if(INATIVOS.size) f.push(INATIVOS.size+" serviço(s) fora da análise");
   const ss = relObra ? ssDaObra(relObra) : "";
   return {titulo: relObra ? ("Confronto da obra "+relObra+(ss?" · SS "+ss:""))
                           : ("Confronto apontado × pago — "+(MODO==="ss"?"obras por SS":"novo contrato")),
-    sub:"Apontado: termômetro de serviços"+(MODO==="ss"?" (pesquisado pela SS)":"")+
-        " · Pago: medição carregada · Gerado em "+new Date().toLocaleString("pt-BR"),
+    sub:"",
     filtros:f.join(" · ")};
 }
 
@@ -2559,8 +2557,8 @@ function relHTML(){
     ${soUmaObra?"":"</div>"}`;
   const o1 = soUmaObra ? d.obras[0] : null;
   return `<div class="rhead"><h1>${c.titulo}</h1>
-      ${o1?`<div class="sub">${esc(o1.desc)}${o1.mun?" · "+esc(o1.mun):""}${o1.equipe?" · Equipe: "+esc(o1.equipe):""}${o1.inat?" · "+o1.inat+" serviço(s) fora da análise":""}</div>`:""}
-      <div class="sub">${c.sub}</div>${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
+      ${o1?`<div class="sub">${esc(o1.desc)}${o1.mun?" · "+esc(o1.mun):""}${o1.equipe?" · Equipe: "+esc(o1.equipe):""}</div>`:""}
+      ${c.sub?`<div class="sub">${c.sub}</div>`:""}${c.filtros?`<div class="sub">${esc(c.filtros)}</div>`:""}</div>
     <div class="rsec${soUmaObra?"":" rquebra"}" style="border-color:#334155">
       <div class="rsectit" style="background:#eef2f7;color:#0f172a;border-bottom:2px solid #334155">
         <span>Resumo</span><span class="rcont">${d.obras.length} obras · ${d.itens} serviços</span>
@@ -2614,9 +2612,9 @@ document.getElementById("relPng").onclick=()=>{
   el.push(["tit",c.titulo]);
   if(relObra&&d.obras[0]){
     const o=d.obras[0];
-    el.push(["sub",`${o.desc}${o.mun?" · "+o.mun:""}${o.equipe?" · Equipe: "+o.equipe:""}${o.inat?" · "+o.inat+" serviço(s) fora da análise":""}`]);
+    el.push(["sub",`${o.desc}${o.mun?" · "+o.mun:""}${o.equipe?" · Equipe: "+o.equipe:""}`]);
   }
-  el.push(["sub",c.sub]);
+  if(c.sub) el.push(["sub",c.sub]);
   if(c.filtros) el.push(["sub",c.filtros]);
   el.push(["esp",8]);
   el.push(["sec",{sit:null,rot:"Resumo",cont:`${d.obras.length} obras · ${d.itens} serviços`,total:d.total,tema:{bg:"#eef2f7",txt:"#0f172a",bar:"#334155",ico:""}}]);
