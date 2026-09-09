@@ -585,6 +585,8 @@ let SS_INV=null;
 const soDig=v=>String(v==null?"":v).replace(/\D/g,"");
 const ssDaObra=o=>(MAPA_SS[o]||{}).ss||"";
 const temSS=o=>!!ssDaObra(o);
+const arqObra=o=>{const s=ssDaObra(o);return s?`${o}-ss-${s}`:String(o)};
+const rotObra=o=>{const s=ssDaObra(o);return s?`Obra ${o} · SS ${s}`:`Obra ${o}`};
 function invSS(){ if(SS_INV) return SS_INV; SS_INV={};
   for(const [o,v] of Object.entries(MAPA_SS)) if(v&&v.ss) SS_INV[soDig(v.ss)]=o;
   return SS_INV }
@@ -1243,7 +1245,7 @@ document.getElementById("csvobra").onclick=()=>{
         String(x.vdif).replace(".",","),`"${x.sit}"`].join(";")));
     const a=document.createElement("a");
     a.href=URL.createObjectURL(new Blob(["﻿"+L.join(SEP)],{type:"text/csv;charset=utf-8"}));
-    a.download=`confronto-obra-${fichaObra}.csv`; a.click(); return;
+    a.download=`confronto-obra-${arqObra(fichaObra)}.csv`; a.click(); return;
   }
   const itens=D.filter(r=>r.num_obra===fichaObra);
   const L=["num_obra;operacao;contrato;cod_mobra;cd_mao_de_obra_descricao;qtd_mo_realizada;vlr_total_real"]
@@ -1251,7 +1253,7 @@ document.getElementById("csvobra").onclick=()=>{
       String(r.qtd_mo_realizada).replace(".",","),String(r.vlr_total_real).replace(".",",")].join(";")));
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob(["﻿"+L.join("\r\n")],{type:"text/csv;charset=utf-8"}));
-  a.download=`obra-${fichaObra}.csv`; a.click();
+  a.download=`obra-${arqObra(fichaObra)}.csv`; a.click();
 };
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));
@@ -2595,7 +2597,7 @@ document.getElementById("relPdf").onclick=()=>{
   document.body.classList.add("imprimindo");
   /* o navegador usa o título da página como nome do arquivo — já sai com o número da obra */
   const tituloOrig=document.title;
-  document.title = relObra ? `Obra ${relObra}` : "Todas as obras";
+  document.title = relObra ? rotObra(relObra) : "Todas as obras";
   const limpar=()=>{document.body.classList.remove("imprimindo");alvo.hidden=true;
     document.title=tituloOrig;window.removeEventListener("afterprint",limpar)};
   window.addEventListener("afterprint",limpar);
@@ -2733,7 +2735,7 @@ document.getElementById("relPng").onclick=()=>{
     txt(brl(Math.abs(v.vdif)),X.valor,y,"#0f172a","700",11.5,"right");
   }
   cv.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);
-    a.download=(relObra?`confronto-obra-${relObra}`:`confronto-${new Date().toISOString().slice(0,10)}`)+".png";
+    a.download=(relObra?`confronto-obra-${arqObra(relObra)}`:`confronto-${new Date().toISOString().slice(0,10)}`)+".png";
     a.click()},"image/png");
 };
 
