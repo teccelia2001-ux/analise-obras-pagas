@@ -964,6 +964,13 @@ function confrontoPorObra(){
   CONF_CACHE=[...m.values()];
   return CONF_CACHE;
 }
+/* valor de cobranca da obra: mesmo calculo do relatorio — o pago a mais e o
+   pago sem apontamento abatem o pendente (entram com sinal negativo) */
+const valCobranca=g=>Math.round((g.pend-g.maior-g.sem)*100)/100;
+/* total a cobrar do conjunto em tela (filtrado ou geral): o pendente das obras
+   marcadas menos o pago a mais e o pago sem apontamento de TODAS as obras da visao */
+const totalCobranca=L=>Math.round((L.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0)
+  -L.reduce((a,g)=>a+g.maior+g.sem,0))*100)/100;
 const ROT_SITCONF={pend:"com pendência de pagamento",maior:"com pago a mais",sem:"com pago sem apontamento",
   nao:"não encontradas no termômetro",ok:"conferidas (sem divergência)",pendval:"pendentes de validação",
   val:"já validadas",cobrar:"marcadas para cobrança","-nao":"sem as não encontradas no termômetro"};
@@ -1000,7 +1007,7 @@ function renderConfronto(){
     ["Pago a mais",brl(soma("maior")),""],
     ["Pago sem apontamento",brl(soma("sem")),""],
     ["Pendentes de validação",nnum(G.filter(g=>!VALIDADAS[g.obra]).length),""],
-    ["💰 A cobrar",brl(G.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0)),"cob"],
+    ["💰 A cobrar",brl(totalCobranca(G)),"cob"],
     ["Obras não encontradas",nnum(G.filter(g=>g.naoenc).length),""]
   ].concat(MODO==="ss"?[["SS mapeadas",nnum(Object.keys(MAPA_SS).length),""]]:[]).map(([l,v,c])=>`<div class="card ${c}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
 
@@ -1696,7 +1703,7 @@ function marcarCobranca(obra){
   if(COBRANCAS[obra]) delete COBRANCAS[obra];
   else{
     const g=confrontoPorObra().find(x=>x.obra===obra);
-    COBRANCAS[obra]={em:new Date().toLocaleString("pt-BR"), valor:g?g.pend:0};
+    COBRANCAS[obra]={em:new Date().toLocaleString("pt-BR"), valor:g?valCobranca(g):0};
   }
   salvarCobrancas(); invalidarConfronto();
   atualizarBotaoCobrar(obra);
@@ -1720,7 +1727,7 @@ function resumoAtual(){
   return {obras:G.length, obrasSS:S.length,
     pendencia:T.reduce((a,g)=>a+g.pend,0),
     validadas:T.filter(g=>VALIDADAS[g.obra]).length,
-    cobranca:T.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0),
+    cobranca:totalCobranca(T),
     lancamentos:D.length};
 }
 function gravarAnalise(id,nome,silencioso){
