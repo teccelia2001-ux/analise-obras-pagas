@@ -1599,17 +1599,22 @@ function lerArquivo(file){
           if(cel&&cel.t==="n"&&cel.z&&/[ymdhs]/.test(String(cel.z))){datas.push(c);break}
         }
       }
+      const analiseAbertaAntes=ANALISE_ATUAL;
       processarPlanilha(aoa,file.name,{datas:datas,aba:nomeAba});
       /* com uma análise aberta, tudo o que vier depois seria gravado por cima dela — pergunta antes */
-      if(ANALISE_ATUAL){
+      let comecarNova=!analiseAbertaAntes;
+      if(analiseAbertaAntes){
         const continuar=confirm(
           "Voc\u00ea abriu outra planilha e a an\u00e1lise \u201c"+ANALISE_ATUAL.nome+"\u201d est\u00e1 aberta.\n\n"+
           "OK = continuar nessa an\u00e1lise (o conte\u00fado dela passa a ser o desta planilha).\n"+
           "Cancelar = come\u00e7ar uma an\u00e1lise nova, deixando \u201c"+ANALISE_ATUAL.nome+"\u201d guardada do jeito que est\u00e1.");
         /* a an\u00e1lise anterior j\u00e1 est\u00e1 gravada; aqui s\u00f3 se solta dela, sem regravar
            \u2014 regravar agora escreveria a planilha nova dentro da an\u00e1lise antiga */
-        if(!continuar){ ANALISE_ATUAL=null; salvarRascunho(); atualizarBarraAnalise() }
+        if(!continuar){ ANALISE_ATUAL=null; salvarRascunho(); atualizarBarraAnalise(); comecarNova=true }
       }
+      /* an\u00e1lise nova n\u00e3o herda confronto, valida\u00e7\u00f5es, cobran\u00e7as etc. de outra
+         an\u00e1lise \u2014 mesmo que os n\u00fameros de obra coincidam */
+      if(comecarNova) iniciarAnaliseNova();
       if(!ANALISE_ATUAL && lerIndice().length)
         fonteEl.innerHTML+=' \u00b7 <b>an\u00e1lise nova</b> \u2014 ao clicar em “💾 Salvar an\u00e1lise\u201d ela entra como mais uma, sem mexer nas anteriores.';
     }catch(err){
@@ -1631,6 +1636,7 @@ document.getElementById("btnLimpar").onclick=()=>{
   if(!D.length){fonteEl.textContent="Não há dados carregados.";return}
   if(!confirm("Apagar os dados atualmente carregados e iniciar uma nova análise? O arquivo da planilha no seu computador não é alterado.")) return;
   D=[]; META={}; montarFiltros();
+  ANALISE_ATUAL=null; iniciarAnaliseNova(); salvarRascunho(); atualizarBarraAnalise();
   ["q","fmun","fsit","fmo","fcon"].forEach(id=>document.getElementById(id).value="");
   vista="obras"; sortKey=null; sortDir=1; limite=200; fichaObra=null;
   document.getElementById("modal").hidden=true; document.body.style.overflow="";
@@ -1711,6 +1717,22 @@ function marcarCobranca(obra){
   if(fichaObra===obra&&fichaTipo==="conf") desenharFichaConfronto();
   render();
   if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
+
+/* zera tudo que é marcação/trabalho em cima de um confronto — usado ao começar
+   uma análise nova, para ela não herdar validação, cobrança, etc. de outra
+   análise que só por acaso reutiliza os mesmos números de obra */
+function iniciarAnaliseNova(){
+  CONFRONTO={linhas:[]}; EQUIPES={};
+  CONFRONTO_SS={linhas:[],naoencontradas:[]}; EQUIPES_SS={};
+  EDICOES={}; salvarEdicoes();
+  INATIVOS=new Set(); salvarInativos();
+  CONFERIDOS={}; salvarConferidos();
+  ADICIONADOS={}; salvarAdicionados();
+  VALIDADAS={}; salvarValidadas();
+  COBRANCAS={}; salvarCobrancas();
+  ANDAMENTO={}; salvarAndamento();
+  UNIT=null; invalidarConfronto(); invalidarCatalogo();
 }
 
 /* ---------- análises salvas ---------- */
