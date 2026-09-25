@@ -70,6 +70,8 @@ tbody tr:hover{background:var(--head)}
 tr.obra{cursor:pointer;font-weight:600;border-left:3px solid var(--accent)}
 tr.obra:hover{background:var(--head)}
 .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+button.tag{cursor:pointer;font-family:inherit}
+button.tag:hover{filter:brightness(0.93)}
 .t-6{background:var(--ok-bg);color:var(--ok-txt);border-color:var(--ok)}
 .t-5{background:rgba(56,189,248,.16);color:#38bdf8;border-color:#38bdf8}
 .t-4{background:rgba(129,140,248,.16);color:#818cf8;border-color:#818cf8}
@@ -1030,7 +1032,7 @@ function renderConfronto(){
       <td class="trunc" title="${esc(desc)}">${esc(desc)||"—"}</td><td>${esc(g.mun)}</td>
       <td>${(EQ()[g.obra]||{}).equipe? esc(EQ()[g.obra].equipe) : '<span class="muted">—</span>'}${susp?' <span class="tagSusp" title="Apontamento idêntico ao de outra obra — confira no termômetro">⚠️ conferir</span>':""}</td>
       <td class="num">${g.div}</td><td class="num">${g.conf}</td><td class="num">${g.inat||"—"}</td>
-      <td>${VALIDADAS[g.obra]?`<span class="tag s-ok">✔️ Validada</span>`:`<span class="tag s-parc">⏳ Pendente</span>`}</td>
+      <td><button class="tag ${VALIDADAS[g.obra]?"s-ok":"s-parc"}" data-validar="${g.obra}" title="${VALIDADAS[g.obra]?"Clique para desfazer a validação":"Clique para validar sem abrir a obra"}">${VALIDADAS[g.obra]?"✔️ Validada":"⏳ Pendente"}</button></td>
       <td>${COBRANCAS[g.obra]?`<span class="tag s-cob">💰 A cobrar</span>`:`<span class="muted">—</span>`}</td>
       <td class="num">${g.pend?brl(g.pend):"—"}</td><td class="num">${g.maior?brl(g.maior):"—"}</td>
       <td class="num">${g.sem?brl(g.sem):"—"}</td><td>${et}</td></tr>`}).join("")
@@ -1254,6 +1256,8 @@ function desenharFicha(){
   });
 }
 document.getElementById("tbl").tBodies[0].addEventListener("click",e=>{
+  const bv=e.target.closest("[data-validar]");
+  if(bv){ e.stopPropagation(); validarObra(bv.dataset.validar); return }
   const tr=e.target.closest("tr.obra"); if(!tr)return;
   if(tr.dataset.c) abrirFicha(tr.dataset.c,"conf"); else abrirFicha(tr.dataset.o,"obra");
 });
