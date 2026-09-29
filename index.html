@@ -722,7 +722,11 @@ const badge=k=>`<span class="tag c-${k}">${ROT[k]}</span>`;
 
 function render(){
   const rows=filtrar();
-  const vazio=!D.length;
+  /* uma análise recuperada sem a planilha original (grande demais para o
+     navegador guardar) ainda tem o confronto — não é "vazia" */
+  const vazio=!D.length && !CONFRONTO.linhas.length && !CONFRONTO_SS.linhas.length;
+  if(vazio){ vista="obras" }
+  else if(!D.length && (vista==="obras"||vista==="itens"||vista==="mo")) vista=MODO==="ss"?"ss":"conf";
   document.getElementById("painel").hidden=vazio;
   document.getElementById("vazio").hidden=!vazio;
   if(vazio){document.getElementById("cards").innerHTML="";return}
