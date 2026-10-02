@@ -557,7 +557,7 @@ html{-webkit-text-size-adjust:100%}
       <button id="btnValidar" hidden></button>
       <button id="btnCobrar" hidden></button>
       <button id="btnAndamento" hidden></button>
-      <button class="sec perigo" id="btnRestaurar" hidden title="Desfaz edições de quantidade, serviços desativados e serviços acrescentados à mão nesta obra, voltando ao apontado × pago original">↺ Restaurar obra</button>
+      <button class="sec perigo" id="btnRestaurar" hidden title="Desfaz edições de quantidade, serviços desativados, acrescentados à mão e conferidos nesta obra, voltando ao apontado × pago original">↺ Restaurar obra</button>
       <button class="sec" id="relobra" hidden>📄 Relatório desta obra</button>
       <button class="sec" id="csvobra">CSV desta obra</button>
       <button class="sec" id="imprimir">Imprimir</button>
@@ -933,12 +933,14 @@ function restaurarObra(obra){
   const nEd=Object.keys(EDICOES).filter(k=>k.startsWith(p)).length;
   const nInat=[...INATIVOS].filter(k=>String(k).startsWith(p)).length;
   const nAdd=(ADICIONADOS[obra]||[]).length;
-  if(!nEd&&!nInat&&!nAdd){ alert("Esta obra não tem edição, serviço desativado nem acrescentado — já está no apontado × pago original."); return }
-  if(!confirm(`Restaurar a obra ${obra} para o apontado × pago original?\n\nIsso desfaz: ${nEd} edição(ões) de quantidade, ${nInat} serviço(s) desativado(s) e ${nAdd} serviço(s) acrescentado(s) à mão. Validação, cobrança e conferidos não são alterados.`)) return;
+  const nConf=Object.keys(CONFERIDOS).filter(k=>k.startsWith(p)).length;
+  if(!nEd&&!nInat&&!nAdd&&!nConf){ alert("Esta obra não tem edição, serviço desativado, acrescentado nem conferido — já está no apontado × pago original."); return }
+  if(!confirm(`Restaurar a obra ${obra} para o apontado × pago original?\n\nIsso desfaz: ${nEd} edição(ões) de quantidade, ${nInat} serviço(s) desativado(s), ${nAdd} serviço(s) acrescentado(s) à mão e desmarca ${nConf} conferido(s). Validação e cobrança não são alteradas.`)) return;
   Object.keys(EDICOES).filter(k=>k.startsWith(p)).forEach(k=>delete EDICOES[k]);
   [...INATIVOS].filter(k=>String(k).startsWith(p)).forEach(k=>INATIVOS.delete(k));
   delete ADICIONADOS[obra];
-  salvarEdicoes(); salvarInativos(); salvarAdicionados();
+  Object.keys(CONFERIDOS).filter(k=>k.startsWith(p)).forEach(k=>delete CONFERIDOS[k]);
+  salvarEdicoes(); salvarInativos(); salvarAdicionados(); salvarConferidos();
   invalidarConfronto(); invalidarCatalogo();
   desenharFichaConfronto(); render();
   if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
