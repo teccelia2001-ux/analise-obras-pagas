@@ -542,6 +542,7 @@ html{-webkit-text-size-adjust:100%}
         <button id="relPng">🖼️ Baixar PNG</button>
         <button id="relPdf">📄 Baixar PDF</button>
         <button class="sec" id="relCobrancaPng" hidden title="Baixa um PNG separado para cada obra marcada para cobrança">📦 PNG de cada obra “A cobrar”</button>
+        <button class="sec" id="relCobrancaPdf" hidden title="Baixa um PDF separado para cada obra marcada para cobrança, sem precisar passar pela caixa de impressão">📦 PDF de cada obra “A cobrar”</button>
       </div>
       <p class="muted" style="font-size:11.5px;margin-bottom:0">No PDF, escolha “Salvar como PDF” na janela de impressão que o navegador abrir.</p>
     </div>
@@ -2715,6 +2716,7 @@ function abrirRelatorio(obra){
     ? `Escopo: <b>somente a obra ${relObra}</b>.` : "Escopo: <b>todas as obras</b> do filtro atual.";
   const nCobranca=Object.keys(COBRANCAS).length;
   document.getElementById("relCobrancaPng").hidden = !!relObra || !nCobranca;
+  document.getElementById("relCobrancaPdf").hidden = !!relObra || !nCobranca;
   document.getElementById("relmodal").hidden=false; relResumo();
 }
 document.getElementById("btnRel").onclick=()=>abrirRelatorio(null);
@@ -2876,32 +2878,66 @@ document.getElementById("relPng").onclick=()=>{
     a.click()},"image/png");
 };
 
-/* um PNG por obra marcada para cobrança — a mesma geração do botão de cima,
-   só que repetida obra a obra e com uma pausa entre downloads para o
-   navegador não bloquear como se fosse pop-up */
-async function baixarRelatoriosCobranca(){
+document.getElementById("relCobrancaPng").onclick=()=>baixarRelatoriosCobranca("png");
+
+/* ---------- PDF por obra (sem passar pela caixa de impressão do navegador) ----------
+   monta um PDF de uma página só, com o mesmo desenho do PNG, encaixado como
+   imagem JPEG — assim dá para gerar vários em sequência sem diálogo nenhum */
+function montarPdfDeImagem(jpegBytes,imgW,imgH,pagW,pagH){
+  const partes=[], offsets=[0];
+  let pos=0;
+  const txt=s=>{const b=new TextEncoder().encode(s); partes.push(b); pos+=b.length};
+  const bin=b=>{partes.push(b); pos+=b.length};
+  const obj=(n,corpo)=>{offsets[n]=pos; txt(`${n} 0 obj\n${corpo}\nendobj\n`)};
+  txt("%PDF-1.4\n");
+  obj(1,"<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2,"<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+  obj(3,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pagW} ${pagH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
+  offsets[4]=pos;
+  txt(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`);
+  bin(jpegBytes);
+  txt("\nendstream\nendobj\n");
+  const conteudo=`q ${pagW} 0 0 ${pagH} 0 0 cm /Im0 Do Q`;
+  obj(5,`<< /Length ${conteudo.length} >>\nstream\n${conteudo}\nendstream`);
+  const xrefPos=pos;
+  txt(`xref\n0 6\n0000000000 65535 f \n`);
+  for(let i=1;i<=5;i++) txt(String(offsets[i]).padStart(10,"0")+" 00000 n \n");
+  txt(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`);
+  return new Blob(partes,{type:"application/pdf"});
+}
+function canvasParaPdfBlob(cv){
+  return new Promise(res=>cv.toBlob(async blob=>{
+    const jpegBytes=new Uint8Array(await blob.arrayBuffer());
+    res(montarPdfDeImagem(jpegBytes,cv.width,cv.height,cv.width/2,cv.height/2));
+  },"image/jpeg",0.92));
+}
+const nomePdfRelatorio=()=>(relObra?`confronto-obra-${arqObra(relObra)}`:`confronto-${new Date().toISOString().slice(0,10)}`)+".pdf";
+
+/* um PNG ou PDF por obra marcada para cobrança, uma obra a cada download,
+   com uma pausa entre eles para o navegador não bloquear como se fosse pop-up */
+async function baixarRelatoriosCobranca(formato){
   const obras=confrontoPorObra().map(g=>g.obra).filter(o=>COBRANCAS[o]);
   if(!obras.length){alert("Nenhuma obra está marcada para cobrança.");return}
-  if(!confirm(`Baixar o relatório em PNG de ${obras.length} obra(s) marcada(s) para cobrança?\n\nO navegador pode pedir para permitir vários downloads — autorize para os arquivos saírem todos.`)) return;
+  if(!confirm(`Baixar o relatório em ${formato.toUpperCase()} de ${obras.length} obra(s) marcada(s) para cobrança?\n\nO navegador pode pedir para permitir vários downloads — autorize para os arquivos saírem todos.`)) return;
   const relObraAntes=relObra;
   let n=0;
   for(const obra of obras){
     relObra=obra;
     const cv=gerarCanvasRelatorio();
     if(cv){
-      await new Promise(res=>cv.toBlob(b=>{
-        const a=document.createElement("a"); a.href=URL.createObjectURL(b);
-        a.download=nomePngRelatorio(); a.click();
-        setTimeout(()=>{URL.revokeObjectURL(a.href); res()},250);
-      },"image/png"));
+      const blob = formato==="pdf" ? await canvasParaPdfBlob(cv) : await new Promise(r=>cv.toBlob(r,"image/png"));
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+      a.download = formato==="pdf" ? nomePdfRelatorio() : nomePngRelatorio();
+      a.click();
+      await new Promise(r=>setTimeout(()=>{URL.revokeObjectURL(a.href); r()},250));
       n++;
     }
-    await new Promise(res=>setTimeout(res,350));
+    await new Promise(r=>setTimeout(r,350));
   }
   relObra=relObraAntes;
   alert(`${n} de ${obras.length} relatório(s) baixado(s). As obras sem serviço nas situações marcadas acima ficaram de fora.`);
 }
-document.getElementById("relCobrancaPng").onclick=baixarRelatoriosCobranca;
+document.getElementById("relCobrancaPdf").onclick=()=>baixarRelatoriosCobranca("pdf");
 
 /* ---------- tema claro/escuro ---------- */
 const btnTema=document.getElementById("tema");
