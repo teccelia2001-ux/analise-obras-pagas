@@ -2373,6 +2373,8 @@ document.getElementById("termoMarcador").onclick=async()=>{
 document.getElementById("termoAplicar").onclick=()=>{
   const el=document.getElementById("termoRes");
   let dados;
+  if(/^javascript:/i.test(document.getElementById("termoCola").value.trim())){
+    el.innerHTML='<span style="color:var(--bad)">❌ Este campo está com o <b>endereço do coletor</b>, não com o resultado. Copie esse texto para a URL de um favorito, abra o termômetro, clique no favorito e, quando terminar, cole aqui o resultado (começa com <code>{"obras"</code>).</span>';return}
   try{dados=JSON.parse(document.getElementById("termoCola").value.trim())}
   catch(e){el.innerHTML='<span style="color:var(--bad)">❌ O conteúdo colado não é um resultado válido do termômetro.</span>';return}
   if(!dados||!dados.obras){el.innerHTML='<span style="color:var(--bad)">❌ Faltam as obras no conteúdo colado.</span>';return}
