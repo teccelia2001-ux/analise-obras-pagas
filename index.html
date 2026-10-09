@@ -1677,7 +1677,6 @@ inputArq.onchange=e=>{lerArquivo(e.target.files[0]); e.target.value=""};
 drop.addEventListener("drop",e=>lerArquivo(e.dataTransfer.files[0]));
 document.getElementById("btnCarregar2").onclick=()=>inputArq.click();
 document.getElementById("btnLimpar").onclick=()=>{
-  if(!D.length){fonteEl.textContent="Não há dados carregados.";return}
   if(!confirm("Apagar TUDO (planilha, confronto, edições, validações, cobranças, andamento e listas) e iniciar uma nova análise? As análises salvas em \"Minhas análises\" são mantidas. O arquivo da planilha no seu computador não é alterado.")) return;
   D=[]; META={}; montarFiltros();
   MAPA_SS=null; SS_INV=null; LISTA=null;
