@@ -2333,10 +2333,23 @@ painel.innerHTML='<div style="font-weight:800;color:#86efac;font-size:15px;margi
  '<div style="color:#93a3bf;margin-top:6px">'+(copiou
    ? 'Resultado copiado. Volte ao sistema, cole no campo e clique em <b>Aplicar</b>.'
    : 'Não consegui copiar: rode <b>copy(window.__resultado)</b> no console.')+'</div>'+
+ '<button id="__cc" style="margin-top:10px;margin-right:8px;padding:6px 12px;border-radius:8px;border:0;background:#16a34a;color:#fff;'+
+ 'font:600 12px system-ui;cursor:pointer">📋 Copiar novamente</button>'+
  '<button id="__cf" style="margin-top:10px;padding:6px 12px;border-radius:8px;border:0;background:#2563eb;color:#fff;'+
  'font:600 12px system-ui;cursor:pointer">Fechar</button>';
 document.getElementById("__cf").onclick=()=>painel.remove();
-setTimeout(()=>{if(painel.isConnected)painel.remove()},60000);
+document.getElementById("__cc").onclick=async()=>{
+  const b=document.getElementById("__cc");
+  let ok=false;
+  try{await navigator.clipboard.writeText(txt); ok=true}catch(e){
+    try{const ta=document.createElement("textarea"); ta.value=txt; ta.style.cssText="position:fixed;opacity:0";
+      document.body.appendChild(ta); ta.select(); ok=document.execCommand("copy"); ta.remove()}catch(e2){}
+  }
+  if(!ok) window.__resultado=txt;
+  b.textContent= ok ? "✅ Copiado! Cole no sistema" : "Não copiou: rode copy(window.__resultado)";
+  setTimeout(()=>{b.textContent="📋 Copiar novamente"},3000);
+};
+setTimeout(()=>{if(painel.isConnected)painel.remove()},600000);
 alert("Coleta concluída: "+OBRAS.length+" obras em "+seg+"s.\\n"+(copiou?"Resultado copiado — cole no sistema.":"Rode copy(window.__resultado) no console."));
 return "Concluido: "+OBRAS.length+" obras em "+seg+"s";
 })()`;
