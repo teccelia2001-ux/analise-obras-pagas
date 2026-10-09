@@ -1056,6 +1056,7 @@ function renderConfronto(){
   const t=document.getElementById("tbl");
   t.tHead.innerHTML=`<tr><th>Nº da obra</th>${eSS?"<th>SS (termômetro)</th>":""}<th>Descrição da obra</th><th>Município</th><th>Equipe (termômetro)</th>
     <th class="num">Divergências</th><th class="num">Conferidos</th><th class="num">Fora da análise</th><th>Validação</th><th>Cobrança</th>
+    <th class="num" title="Mesmo valor do relatório: pendente − pago a mais − pago sem apontamento">Diferença</th>
     <th class="num" data-k="pend">Pendente de pagamento${sortKey==="pend"?(sortDir>0?" ▲":" ▼"):""}</th>
     <th class="num">Pago a mais</th><th class="num">Sem apontamento</th><th>Situação</th></tr>`;
   t.tBodies[0].innerHTML=G.slice(0,limite).map(g=>{
@@ -1073,16 +1074,18 @@ function renderConfronto(){
       <td class="num">${g.div}</td><td class="num">${g.conf}</td><td class="num">${g.inat||"—"}</td>
       <td><button class="tag ${VALIDADAS[g.obra]?"s-ok":"s-parc"}" data-validar="${g.obra}" title="${VALIDADAS[g.obra]?"Clique para desfazer a validação":"Clique para validar sem abrir a obra"}">${VALIDADAS[g.obra]?"✔️ Validada":"⏳ Pendente"}</button></td>
       <td>${COBRANCAS[g.obra]?`<span class="tag s-cob">💰 A cobrar</span>`:`<span class="muted">—</span>`}</td>
+      <td class="num" style="font-weight:700${valCobranca(g)<0?";color:var(--bad-txt)":""}">${valCobranca(g)?brl(valCobranca(g)):"—"}</td>
       <td class="num">${g.pend?brl(g.pend):"—"}</td><td class="num">${g.maior?brl(g.maior):"—"}</td>
       <td class="num">${g.sem?brl(g.sem):"—"}</td><td>${et}</td></tr>`}).join("")
-    ||`<tr><td colspan="${eSS?14:13}" class="muted" style="padding:20px">${listaDoModo(MODO)
+    ||`<tr><td colspan="${eSS?15:14}" class="muted" style="padding:20px">${listaDoModo(MODO)
       ? "Nenhuma obra desta aba foi coletada ainda — a lista “"+esc(LISTA.nome||"carregada")+"” está no comando. Rode a coleta, ou volte a usar a medição no aviso do topo."
       : "Nenhuma obra no filtro atual."}</td></tr>`;
   document.getElementById("info").textContent=`Exibindo ${Math.min(limite,G.length)} de ${nnum(G.length)} obras`;
   document.getElementById("mais").hidden=G.length<=limite;
   atualizarBotaoInativos(true);
   window._exp={head:[["obra","Nº da obra"],...(eSS?[["ss","SS"]]:[]),["mun","Município"],["div","Divergências"],["conf","Conferidos"],
-      ["pend","Pendente de pagamento"],["maior","Pago a mais"],["sem","Pago sem apontamento"]],dados:eSS?G.map(g=>Object.assign({},g,{ss:ssDaObra(g.obra)})):G};
+      ["dif","Diferença"],["pend","Pendente de pagamento"],["maior","Pago a mais"],["sem","Pago sem apontamento"]],
+      dados:G.map(g=>Object.assign({},g,{dif:valCobranca(g)},eSS?{ss:ssDaObra(g.obra)}:{}))};
 }
 
 /* ficha de confronto de uma obra — mesmo padrão da ficha da obra */
