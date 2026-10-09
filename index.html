@@ -478,6 +478,7 @@ html{-webkit-text-size-adjust:100%}
       <textarea id="termoCola" placeholder="Cole aqui o resultado da coleta" style="width:100%;height:90px;font:12px monospace;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
       <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
         <button id="termoAplicar">✅ Aplicar e refazer confronto</button>
+        <button class="sec" id="termoUltimo">📄 Mostrar último resultado</button>
         <span id="termoRes" style="font-size:12.5px"></span>
       </div>
     </div>
@@ -1680,7 +1681,7 @@ document.getElementById("btnLimpar").onclick=()=>{
   if(!confirm("Apagar TUDO (planilha, confronto, edições, validações, cobranças, andamento e listas) e iniciar uma nova análise? As análises salvas em \"Minhas análises\" são mantidas. O arquivo da planilha no seu computador não é alterado.")) return;
   D=[]; META={}; montarFiltros();
   MAPA_SS=Object.assign({},MAPA_SS_PADRAO); SS_INV=null; LISTA=null;
-  ["mapa-ss","lista-pesquisa"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+  ["mapa-ss","lista-pesquisa","termo-ultimo-resultado"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
   ANALISE_ATUAL=null; iniciarAnaliseNova(); salvarRascunho(); atualizarBarraAnalise();
   ["q","fmun","fsit","fmo","fcon"].forEach(id=>document.getElementById(id).value="");
   vista="obras"; sortKey=null; sortDir=1; limite=200; fichaObra=null;
@@ -2370,6 +2371,15 @@ document.getElementById("termoMarcador").onclick=async()=>{
   catch(e){const t=document.getElementById("termoCola"); t.value=bm; t.select();
     el.innerHTML="Está no campo abaixo: selecione tudo, copie e cole na URL de um favorito novo.";}
 };
+/* o último resultado aplicado fica guardado, para copiar de novo sem refazer a coleta */
+document.getElementById("termoUltimo").onclick=()=>{
+  const el=document.getElementById("termoRes"), t=document.getElementById("termoCola");
+  let v=null; try{v=localStorage.getItem("termo-ultimo-resultado")}catch(e){}
+  if(!v){el.innerHTML='<span style="color:var(--bad)">Ainda não há resultado guardado — ele é guardado quando você clica em “Aplicar e refazer confronto”.</span>';return}
+  t.value=v; t.focus(); t.select();
+  let info=""; try{const d=JSON.parse(v); info=` (${nnum(Object.keys(d.obras||{}).length)} obras${d.gerado?`, coletado em ${new Date(d.gerado).toLocaleString("pt-BR")}`:""})`}catch(e){}
+  el.innerHTML=`Último resultado${info} está no campo, já selecionado — copie com <b>Ctrl+C</b>.`;
+};
 document.getElementById("termoAplicar").onclick=()=>{
   const el=document.getElementById("termoRes");
   let dados;
@@ -2378,6 +2388,7 @@ document.getElementById("termoAplicar").onclick=()=>{
   try{dados=JSON.parse(document.getElementById("termoCola").value.trim())}
   catch(e){el.innerHTML='<span style="color:var(--bad)">❌ O conteúdo colado não é um resultado válido do termômetro.</span>';return}
   if(!dados||!dados.obras){el.innerHTML='<span style="color:var(--bad)">❌ Faltam as obras no conteúdo colado.</span>';return}
+  try{localStorage.setItem("termo-ultimo-resultado",document.getElementById("termoCola").value.trim())}catch(e){}
   MODO="obra"; invalidarConfronto(); invalidarCatalogo(); UNIT=null;
   const r=calcularConfronto(dados,"obra");
   vista="conf"; sortKey=null; sortDir=1; limite=200;
