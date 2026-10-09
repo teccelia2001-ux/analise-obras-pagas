@@ -1679,7 +1679,7 @@ document.getElementById("btnCarregar2").onclick=()=>inputArq.click();
 document.getElementById("btnLimpar").onclick=()=>{
   if(!confirm("Apagar TUDO (planilha, confronto, edições, validações, cobranças, andamento e listas) e iniciar uma nova análise? As análises salvas em \"Minhas análises\" são mantidas. O arquivo da planilha no seu computador não é alterado.")) return;
   D=[]; META={}; montarFiltros();
-  MAPA_SS=null; SS_INV=null; LISTA=null;
+  MAPA_SS=Object.assign({},MAPA_SS_PADRAO); SS_INV=null; LISTA=null;
   ["mapa-ss","lista-pesquisa"].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
   ANALISE_ATUAL=null; iniciarAnaliseNova(); salvarRascunho(); atualizarBarraAnalise();
   ["q","fmun","fsit","fmo","fcon"].forEach(id=>document.getElementById(id).value="");
