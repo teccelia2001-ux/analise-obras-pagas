@@ -27,8 +27,6 @@ header{background:linear-gradient(90deg,var(--panel),var(--panel2));padding:14px
 h1{margin:0;font-size:18px}
 .sub{color:var(--muted);font-size:12px;margin-top:2px}
 .wrap{padding:16px 20px;max-width:1500px;margin:0 auto}
-a.voltar{color:var(--accent);text-decoration:none;font-size:13px;font-weight:600}
-a.voltar:hover{text-decoration:underline}
 input,select,button,textarea{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
 button{cursor:pointer;background:var(--btn);border-color:var(--btn);color:#fff;font-weight:600}
@@ -134,7 +132,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 <header>
   <div>
     <h1>💰 Acompanhar cobranças</h1>
-    <div class="sub"><a class="voltar" href="index.html">← Voltar à análise</a></div>
+    <div class="sub">Histórico próprio, independente — nada daqui é compartilhado com outro sistema.</div>
   </div>
   <span style="flex:1"></span>
   <button class="sec" id="tema" title="Alternar fundo claro/escuro">🌙 Escuro</button>
@@ -143,10 +141,10 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 
   <div class="painel">
     <p class="muted" style="margin-top:0;font-size:12.5px">
-      Cole aqui o <b>código de recuperação</b> (🔑, gerado em “Minhas análises” ou na ficha, na análise principal) de
-      cada análise salva, uma de cada mês. Esta página junta as obras marcadas para <b>cobrança</b> em cada uma e
-      mostra, mês a mês, se a pendência já foi paga ou ainda continua — sem precisar abrir a análise inteira. Isso
-      fica guardado só neste navegador; para ver no celular ou outro computador, importe os mesmos códigos lá também.</p>
+      Cole aqui o <b>código de recuperação</b> (🔑, um texto que começa com “AOP1-”) de cada período que você quer
+      acompanhar. Esta página junta as obras marcadas para <b>cobrança</b> em cada código colado e mostra, período a
+      período, se a pendência já foi paga ou ainda continua. Isso fica guardado só neste navegador e só nesta
+      página; para ver no celular ou outro computador, cole os mesmos códigos lá também.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
       <textarea id="txtCodigoCobranca" spellcheck="false" placeholder="Cole aqui o código da análise (começa com AOP1-)…"
         style="flex:1;min-width:260px;min-height:70px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:11px;
@@ -227,11 +225,11 @@ async function lerCodigo(texto){
   return a;
 }
 
-/* ---------- acompanhar cobranças: histórico entre análises de meses diferentes ----------
+/* ---------- acompanhar cobranças: histórico entre períodos diferentes ----------
    guarda só o necessário por obra (situação calculada e o que foi marcado para
-   cobrança), nunca a planilha inteira — assim várias análises cabem tranquilas.
-   Mesma chave de localStorage usada na análise principal, então o que já tiver
-   sido importado lá continua aqui. */
+   cobrança), nunca a planilha inteira — assim vários períodos cabem tranquilos.
+   Chave de localStorage própria desta página — nenhum outro sistema lê ou
+   escreve aqui. */
 const HIST_COB="historico-cobrancas";
 let HIST_COBRANCA=[];
 try{const h=localStorage.getItem(HIST_COB); if(h) HIST_COBRANCA=JSON.parse(h)}catch(e){}
@@ -416,15 +414,15 @@ document.getElementById("btnImportarCobranca").onclick=async ()=>{
   }catch(e){ msg.innerHTML='<span style="color:var(--bad)">❌ '+esc(e.message)+"</span>" }
 };
 
-/* ---------- tema claro/escuro — mesma chave da análise principal ---------- */
+/* ---------- tema claro/escuro — chave própria, não compartilhada com outro sistema ---------- */
 const btnTema=document.getElementById("tema");
 function aplicarTema(t){
   document.documentElement.dataset.tema=t;
   btnTema.textContent = t==="claro" ? "☀️ Claro" : "🌙 Escuro";
-  try{localStorage.setItem("tema-obras",t)}catch(e){}
+  try{localStorage.setItem("tema-cobrancas",t)}catch(e){}
 }
 btnTema.onclick=()=>aplicarTema(document.documentElement.dataset.tema==="claro"?"escuro":"claro");
-let tSalvo="escuro"; try{tSalvo=localStorage.getItem("tema-obras")||"escuro"}catch(e){}
+let tSalvo="escuro"; try{tSalvo=localStorage.getItem("tema-cobrancas")||"escuro"}catch(e){}
 aplicarTema(tSalvo);
 
 renderHistoricoCobranca();
