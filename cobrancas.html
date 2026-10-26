@@ -260,7 +260,7 @@ function situacaoPorObraDoCodigo(confronto,inativos){
   }
   const out={};
   for(const [obra,g] of m)
-    out[obra]={mun:g.mun,naoenc:g.naoenc,pend:Math.round((g.pend-g.maior-g.sem)*100)/100};
+    out[obra]={mun:g.mun,naoenc:g.naoenc,div:g.div,pend:Math.round((g.pend-g.maior-g.sem)*100)/100};
   return {situacao:out,itens};
 }
 async function importarParaHistoricoCobranca(texto){
@@ -286,6 +286,20 @@ function removerDoHistoricoCobranca(id){
   HIST_COBRANCA=HIST_COBRANCA.filter(x=>x.id!==id);
   salvarHistCobranca(); renderHistoricoCobranca();
 }
+/* "quitada" só quando a obra não tem NENHUM serviço ativo com divergência
+   (nem pendente, nem pago a mais, nem pago sem apontamento) — um saldo
+   líquido zerado por compensação entre serviços não conta como quitada.
+   Serviços desativados já ficam de fora (situacaoPorObraDoCodigo ignora
+   os INATIVOS). Histórico importado antes desta mudança não tem "div"
+   guardado — nesse caso cai no critério antigo (saldo líquido) até ser
+   reimportado. */
+function classificar(s){
+  if(!s) return {tipo:"ausente",pend:null};
+  if(s.naoenc) return {tipo:"naoenc",pend:null};
+  if(s.div===undefined) return s.pend>0.005 ? {tipo:"pendente",pend:s.pend} : {tipo:"quitada",pend:0};
+  if(s.div===0) return {tipo:"quitada",pend:0};
+  return s.pend>0.005 ? {tipo:"pendente",pend:s.pend} : {tipo:"divergencia",pend:s.pend};
+}
 function renderHistoricoCobranca(){
   const elLista=document.getElementById("histCobrancaLista");
   elLista.innerHTML = HIST_COBRANCA.length ? HIST_COBRANCA.map(h=>`
@@ -307,14 +321,17 @@ function renderHistoricoCobranca(){
   }
   tbl.tHead.innerHTML=`<tr><th>Obra</th><th>Município</th>${HIST_COBRANCA.map(h=>
     `<th title="${esc(h.nome)}">${esc(h.nome.length>22?h.nome.slice(0,21)+"…":h.nome)}<br><span style="font-weight:400;font-size:10.5px;opacity:.75">${esc(h.mes)}</span></th>`).join("")}<th>Situação atual</th></tr>`;
+  const PRECISA_ATENCAO=new Set(["pendente","divergencia"]);
   const celula=(h,obra)=>{
     const marcada=h.cobrancas&&h.cobrancas[obra];
-    if(!marcada) return {html:'<span class="muted">—</span>',pend:null,marcada:false};
-    const s=h.situacao[obra];
-    if(!s) return {html:'<span class="muted">obra não apareceu nesta análise</span>',pend:null,marcada:true};
-    if(s.naoenc) return {html:'<span class="tag s-nao">não encontrada</span>',pend:null,marcada:true};
-    if(s.pend>0.005) return {html:`<span class="tag s-pend">${brl(s.pend)}</span>`,pend:s.pend,marcada:true};
-    return {html:'<span class="tag s-ok">✔️ quitada</span>',pend:0,marcada:true};
+    if(!marcada) return {html:'<span class="muted">—</span>',pend:null,marcada:false,tipo:null};
+    const c=classificar(h.situacao[obra]);
+    const html = c.tipo==="ausente" ? '<span class="muted">obra não apareceu nesta análise</span>'
+      : c.tipo==="naoenc" ? '<span class="tag s-nao">não encontrada</span>'
+      : c.tipo==="quitada" ? '<span class="tag s-ok">✔️ quitada</span>'
+      : c.tipo==="pendente" ? `<span class="tag s-pend">${brl(c.pend)}</span>`
+      : `<span class="tag s-parc">⚠️ divergência${c.pend?" · "+brl(c.pend):""}</span>`;
+    return {html,pend:c.pend,marcada:true,tipo:c.tipo};
   };
   const linhas=obras.map(obra=>{
     let mun="", ultima=null;
@@ -323,23 +340,23 @@ function renderHistoricoCobranca(){
       if(c.marcada){ const s=h.situacao[obra]; if(s) mun=s.mun||mun; ultima=c }
       return c;
     });
-    const atual = !ultima ? {html:'<span class="muted">não marcada para cobrança em nenhuma análise importada</span>',pend:null}
-      : ultima.pend===null ? ultima
-      : ultima.pend>0.005 ? {html:`<span class="tag s-pend">🔴 ainda pendente — ${brl(ultima.pend)}</span>`,pend:ultima.pend}
-      : {html:'<span class="tag s-ok">✅ quitada</span>',pend:0};
+    const atual = !ultima ? {html:'<span class="muted">não marcada para cobrança em nenhuma análise importada</span>',tipo:null}
+      : ultima.tipo==="ausente"||ultima.tipo==="naoenc" ? ultima
+      : ultima.tipo==="quitada" ? {html:'<span class="tag s-ok">✅ quitada</span>',pend:0,tipo:"quitada"}
+      : ultima.tipo==="pendente" ? {html:`<span class="tag s-pend">🔴 ainda pendente — ${brl(ultima.pend)}</span>`,pend:ultima.pend,tipo:"pendente"}
+      : {html:`<span class="tag s-parc">⚠️ ainda com divergência${ultima.pend?" · "+brl(ultima.pend):""}</span>`,pend:ultima.pend,tipo:"divergencia"};
     return {obra,mun,cels,atual};
-  }).filter(l=>!soPend||(l.atual.pend>0.005));
+  }).filter(l=>!soPend||PRECISA_ATENCAO.has(l.atual.tipo));
   linhas.sort((a,b)=>(b.atual.pend||0)-(a.atual.pend||0)||a.obra.localeCompare(b.obra));
   tbl.tBodies[0].innerHTML = linhas.length
     ? linhas.map(l=>`<tr class="obra" data-obra="${esc(l.obra)}" title="Clique para ver o detalhe dos serviços"><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${l.cels.map(c=>`<td>${c.html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
     : `<tr><td colspan="${HIST_COBRANCA.length+3}" class="muted" style="padding:16px">Nenhuma obra ${soPend?"ainda pendente":"para mostrar"}.</td></tr>`;
   const todas=obras.map(o=>{
     const marcadas=[...HIST_COBRANCA].reverse().map(h=>celula(h,o)).filter(c=>c.marcada);
-    const ultima=marcadas[0];
-    return ultima&&ultima.pend!==null?ultima.pend:0;
+    return marcadas[0]||{tipo:null,pend:null};
   });
-  const nPend=todas.filter(p=>p>0.005).length;
-  const total=todas.reduce((a,p)=>a+(p>0?p:0),0);
+  const nPend=todas.filter(c=>PRECISA_ATENCAO.has(c.tipo)).length;
+  const total=todas.reduce((a,c)=>a+(c.pend>0?c.pend:0),0);
   document.getElementById("cards").innerHTML=[
     ["Análises importadas",nnum(HIST_COBRANCA.length),""],
     ["Obras acompanhadas",nnum(obras.length),""],
@@ -381,8 +398,10 @@ function abrirDetalheHistObra(obra){
     const marcada=h.cobrancas&&h.cobrancas[obra];
     const itens=(h.itens||{})[obra]||[];
     const badgeMarcada = marcada ? '<span class="tag s-cob">💰 Marcada para cobrança</span>' : '<span class="tag s-nao">não marcada para cobrança nesta análise</span>';
-    const badgeAtual = s.naoenc ? '<span class="tag s-nao">⚠️ Não encontrada no termômetro</span>'
-      : s.pend>0.005 ? `<span class="tag s-pend">🔴 Pendente de pagamento</span>`
+    const c=classificar(s);
+    const badgeAtual = c.tipo==="naoenc" ? '<span class="tag s-nao">⚠️ Não encontrada no termômetro</span>'
+      : c.tipo==="pendente" ? `<span class="tag s-pend">🔴 Pendente de pagamento</span>`
+      : c.tipo==="divergencia" ? `<span class="tag s-parc">⚠️ Divergência (saldo compensado)</span>`
       : '<span class="tag s-ok">✔️ Conferida</span>';
     const avisoSemDetalhe = !h.itens ? '<p class="muted" style="margin:6px 0 0;font-size:12px">Esta análise foi importada antes de o detalhe por serviço ser guardado — reimporte o código dela para ver os serviços aqui.</p>' : '';
     return cab+`<div style="margin:8px 0 10px;display:flex;gap:6px;flex-wrap:wrap">${badgeMarcada}${badgeAtual}</div>${avisoSemDetalhe}
