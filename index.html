@@ -170,6 +170,8 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 #analisesmodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:70;overflow:auto}
 #cobrancaModal[hidden]{display:none}
 #cobrancaModal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:70;overflow:auto}
+#histDetalheModal[hidden]{display:none}
+#histDetalheModal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:75;overflow:auto}
 .itemAnalise{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .itemAnalise.atual{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 @media (max-width:700px){.itemAnalise{flex-direction:column;align-items:stretch}.itemAnalise button{width:100%}}
@@ -476,6 +478,14 @@ html{-webkit-text-size-adjust:100%}
       </div>
       <div class="scroll" style="margin-top:8px"><table id="histTabela"><thead></thead><tbody></tbody></table></div>
     </div>
+  </div>
+</div>
+
+<div id="histDetalheModal" hidden>
+  <div class="mbox" style="max-width:860px">
+    <div class="mtop"><strong id="histDetalheTitulo">Obra</strong><span style="flex:1"></span>
+      <button class="sec" id="histDetalheFechar">Fechar ✕</button></div>
+    <div id="histDetalheCorpo" style="padding:16px"></div>
   </div>
 </div>
 
@@ -2118,7 +2128,7 @@ const mesDeQuando=iso=>{const d=new Date(iso); return isNaN(d)?"—":MESES_PT[d.
    feito depois de salvar, e o código salvo é só a fotografia daquele dia */
 function situacaoPorObraDoCodigo(confronto,inativos){
   const INAT=new Set(inativos||[]);
-  const m=new Map();
+  const m=new Map(), itens={};
   for(const r of (confronto&&confronto.linhas)||[]){
     const [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
     if(INAT.has(obra+"|"+op+"|"+cod)) continue;
@@ -2129,17 +2139,20 @@ function situacaoPorObraDoCodigo(confronto,inativos){
     else if(sit==="Pago a mais"){g.maior+=Math.abs(vdif);g.div++}
     else if(sit==="Pago sem apontamento"){g.sem+=Math.abs(vdif);g.div++}
     else if(sit==="Conferido") g.conf++;
+    /* só guarda o item se ele pesa na cobrança — "Conferido" não precisa de detalhe */
+    if(sit!=="Conferido") (itens[obra]||(itens[obra]=[])).push({op,cod,serv,qa,qp,dif,vdif,sit});
   }
   const out={};
   for(const [obra,g] of m)
     out[obra]={mun:g.mun,naoenc:g.naoenc,pend:Math.round((g.pend-g.maior-g.sem)*100)/100};
-  return out;
+  return {situacao:out,itens};
 }
 async function importarParaHistoricoCobranca(texto){
   const a=await lerCodigo(texto);
   if(!a.confronto||!a.confronto.linhas) throw new Error("Este código não tem um confronto para acompanhar.");
+  const {situacao,itens}=situacaoPorObraDoCodigo(a.confronto,a.inativos);
   const snap={id:a.id,nome:a.nome,quando:a.quando,mes:mesDeQuando(a.quando),
-    cobrancas:a.cobrancas||{},situacao:situacaoPorObraDoCodigo(a.confronto,a.inativos)};
+    cobrancas:a.cobrancas||{},situacao,itens};
   const i=HIST_COBRANCA.findIndex(h=>h.id===snap.id);
   if(i>=0) HIST_COBRANCA[i]=snap; else HIST_COBRANCA.push(snap);
   HIST_COBRANCA.sort((x,y)=>new Date(x.quando)-new Date(y.quando));
@@ -2198,7 +2211,7 @@ function renderHistoricoCobranca(){
   }).filter(l=>!soPend||(l.atual.pend>0.005));
   linhas.sort((a,b)=>(b.atual.pend||0)-(a.atual.pend||0)||a.obra.localeCompare(b.obra));
   tbl.tBodies[0].innerHTML = linhas.length
-    ? linhas.map(l=>`<tr><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${l.cels.map(c=>`<td>${c.html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
+    ? linhas.map(l=>`<tr class="obra" data-obra="${esc(l.obra)}" title="Clique para ver o detalhe dos serviços"><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${l.cels.map(c=>`<td>${c.html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
     : `<tr><td colspan="${HIST_COBRANCA.length+3}" class="muted" style="padding:16px">Nenhuma obra ${soPend?"ainda pendente":"para mostrar"}.</td></tr>`;
   const todas=obras.map(o=>{
     const ultima=[...HIST_COBRANCA].reverse().map(h=>h.situacao[o]).find(Boolean);
@@ -2218,6 +2231,35 @@ document.getElementById("histSoPendentes").onchange=renderHistoricoCobranca;
 document.getElementById("histCobrancaLista").addEventListener("click",e=>{
   const b=e.target.closest("button[data-remhist]"); if(b) removerDoHistoricoCobranca(b.dataset.remhist);
 });
+document.getElementById("histTabela").addEventListener("click",e=>{
+  const tr=e.target.closest("tr.obra"); if(tr) abrirDetalheHistObra(tr.dataset.obra);
+});
+function fecharDetalheHistObra(){document.getElementById("histDetalheModal").hidden=true}
+document.getElementById("histDetalheFechar").onclick=fecharDetalheHistObra;
+document.getElementById("histDetalheModal").addEventListener("click",e=>{if(e.target.id==="histDetalheModal")fecharDetalheHistObra()});
+/* ficha de leitura só com o que ficou guardado no histórico — item a item,
+   análise por análise, pra ver a mesma pendência indo embora com o tempo */
+function abrirDetalheHistObra(obra){
+  document.getElementById("histDetalheTitulo").textContent=`Obra ${obra}`;
+  const linha=t=>`<tr><td>${t.cod}</td><td class="${t.op==="I"?"op-i":"op-r"}">${t.op==="I"?"▲ Inst.":"▼ Retir."}</td>
+    <td>${esc(t.serv)}</td><td class="num">${nnum(t.qa)}</td><td class="num">${nnum(t.qp)}</td>
+    <td class="num">${nnum(t.dif)}</td><td class="num">${brl(Math.abs(t.vdif))}</td><td>${tag(t.sit)}</td></tr>`;
+  const secao=h=>{
+    const s=h.situacao[obra];
+    const cab=`<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:18px 0 6px">
+      <strong>${esc(h.nome)}</strong><span class="muted" style="font-size:12px">${esc(h.mes)} · salva em ${new Date(h.quando).toLocaleString("pt-BR")}</span></div>`;
+    if(!s) return cab+'<p class="muted" style="margin:0">Esta obra não apareceu nesta análise.</p>';
+    if(s.naoenc) return cab+'<p class="muted" style="margin:0">⚠️ Obra não encontrada no termômetro nesta análise.</p>';
+    const itens=(h.itens||{})[obra]||[];
+    if(!itens.length) return cab+`<p style="margin:0">${s.pend>0.005?`<span class="tag s-pend">${brl(s.pend)} pendente</span>`:'<span class="tag s-ok">✔️ Conferida — sem pendência</span>'} ${!h.itens?'<span class="muted">(reimporte o código desta análise para ver os serviços — este histórico foi importado antes de guardar o detalhe)</span>':''}</p>`;
+    return cab+`<p style="margin:0 0 6px">${s.pend>0.005?`<span class="tag s-pend">${brl(s.pend)} pendente no total</span>`:'<span class="tag s-ok">✔️ sem pendência — só divergências já compensadas</span>'}</p>
+      <table><thead><tr><th>Código</th><th>Op.</th><th>Serviço</th><th class="num">Apontado</th><th class="num">Pago</th>
+        <th class="num">Diferença</th><th class="num">Valor</th><th>Situação</th></tr></thead>
+        <tbody>${itens.map(linha).join("")}</tbody></table>`;
+  };
+  document.getElementById("histDetalheCorpo").innerHTML = HIST_COBRANCA.map(secao).join("");
+  document.getElementById("histDetalheModal").hidden=false;
+}
 document.getElementById("btnArquivoCobranca").onclick=()=>document.getElementById("fileCobranca").click();
 document.getElementById("fileCobranca").onchange=e=>{
   const f=e.target.files&&e.target.files[0]; if(!f) return;
