@@ -342,6 +342,7 @@ html{-webkit-text-size-adjust:100%}
     <button class="sec" id="btnSalvar" title="Atualizar a análise aberta ou guardar mais uma">💾 Salvar análise</button>
     <button class="sec" id="btnCodigoAtual" title="Salvar e gerar o código de recuperação desta análise">🔑 Código desta análise</button>
     <button class="sec" id="btnAnalises">📂 Minhas análises</button>
+    <button class="sec" id="btnCobrancas" title="Acompanhar, mês a mês, se as obras marcadas para cobrança já foram pagas">💰 Acompanhar cobranças</button>
     <button class="sec perigo" id="btnLimpar">🗑️ Apagar dados</button>
     <input type="file" id="arq" accept=".xls,.xlsx,.xlsm,.csv" hidden>
   </div>
@@ -438,6 +439,40 @@ html{-webkit-text-size-adjust:100%}
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="cobrancaModal" hidden>
+  <div class="mbox" style="max-width:980px">
+    <div class="mtop"><strong>💰 Acompanhar cobranças</strong><span style="flex:1"></span>
+      <button class="sec" id="cobrancaFechar">Fechar ✕</button></div>
+    <div style="padding:16px">
+      <p class="muted" style="margin-top:0;font-size:12.5px">
+        Cole aqui o <b>código de recuperação</b> (🔑, gerado em “Minhas análises” ou na ficha) de cada análise salva,
+        uma de cada mês. O sistema junta as obras marcadas para <b>cobrança</b> em cada uma e mostra, mês a mês, se
+        a pendência já foi paga ou ainda continua — sem precisar reabrir a análise inteira. Isso fica guardado só neste
+        navegador; para ver no celular ou outro computador, importe os mesmos códigos lá também.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+        <textarea id="txtCodigoCobranca" spellcheck="false" placeholder="Cole aqui o código da análise (começa com AOP1-)…"
+          style="flex:1;min-width:260px;min-height:70px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:11px;
+                 padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:inherit"></textarea>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button id="btnImportarCobranca">Adicionar ao histórico</button>
+          <button class="sec" id="btnArquivoCobranca">📄 Abrir arquivo .txt</button>
+          <input type="file" id="fileCobranca" accept=".txt,.aop,text/plain" hidden>
+        </div>
+      </div>
+      <p id="msgCobranca" class="muted" style="font-size:12px;margin:6px 0 0"></p>
+
+      <div id="histCobrancaLista" style="display:flex;flex-direction:column;gap:8px;margin-top:14px"></div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
+        <label style="font-size:13px"><input type="checkbox" id="histSoPendentes"> Mostrar só as que ainda estão pendentes</label>
+        <span style="flex:1"></span>
+        <span id="histResumo" class="muted" style="font-size:12.5px"></span>
+      </div>
+      <div class="scroll" style="margin-top:8px"><table id="histTabela"><thead></thead><tbody></tbody></table></div>
     </div>
   </div>
 </div>
@@ -2066,6 +2101,141 @@ document.getElementById("btnRestaurarCodigo").onclick=async ()=>{
     abrirAnalise(id);
   }catch(e){ msg.innerHTML='<span style="color:var(--bad)">❌ '+esc(e.message)+"</span>" }
 };
+
+/* ---------- acompanhar cobranças: histórico entre análises de meses diferentes ----------
+   guarda só o necessário por obra (situação calculada e o que foi marcado para
+   cobrança), nunca a planilha inteira — assim várias análises cabem tranquilas */
+const HIST_COB="historico-cobrancas";
+let HIST_COBRANCA=[];
+try{const h=localStorage.getItem(HIST_COB); if(h) HIST_COBRANCA=JSON.parse(h)}catch(e){}
+function salvarHistCobranca(){try{localStorage.setItem(HIST_COB,JSON.stringify(HIST_COBRANCA))}catch(e){}}
+const MESES_PT=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const mesDeQuando=iso=>{const d=new Date(iso); return isNaN(d)?"—":MESES_PT[d.getMonth()]+"/"+d.getFullYear()};
+/* mesmo cálculo do confrontoPorObra/valCobranca, só que lendo o confronto
+   congelado no código — não usa EDICOES/ADICIONADOS porque isso é trabalho
+   feito depois de salvar, e o código salvo é só a fotografia daquele dia */
+function situacaoPorObraDoCodigo(confronto,inativos){
+  const INAT=new Set(inativos||[]);
+  const m=new Map();
+  for(const r of (confronto&&confronto.linhas)||[]){
+    const [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
+    if(INAT.has(obra+"|"+op+"|"+cod)) continue;
+    if(!m.has(obra)) m.set(obra,{mun,pend:0,maior:0,sem:0,div:0,conf:0,naoenc:false});
+    const g=m.get(obra);
+    if(sit==="Obra não encontrada no termômetro") g.naoenc=true;
+    else if(sit==="Pendente de pagamento"||sit==="Pagamento parcial"){g.pend+=vdif;g.div++}
+    else if(sit==="Pago a mais"){g.maior+=Math.abs(vdif);g.div++}
+    else if(sit==="Pago sem apontamento"){g.sem+=Math.abs(vdif);g.div++}
+    else if(sit==="Conferido") g.conf++;
+  }
+  const out={};
+  for(const [obra,g] of m)
+    out[obra]={mun:g.mun,naoenc:g.naoenc,pend:Math.round((g.pend-g.maior-g.sem)*100)/100};
+  return out;
+}
+async function importarParaHistoricoCobranca(texto){
+  const a=await lerCodigo(texto);
+  if(!a.confronto||!a.confronto.linhas) throw new Error("Este código não tem um confronto para acompanhar.");
+  const snap={id:a.id,nome:a.nome,quando:a.quando,mes:mesDeQuando(a.quando),
+    cobrancas:a.cobrancas||{},situacao:situacaoPorObraDoCodigo(a.confronto,a.inativos)};
+  const i=HIST_COBRANCA.findIndex(h=>h.id===snap.id);
+  if(i>=0) HIST_COBRANCA[i]=snap; else HIST_COBRANCA.push(snap);
+  HIST_COBRANCA.sort((x,y)=>new Date(x.quando)-new Date(y.quando));
+  salvarHistCobranca();
+  return snap;
+}
+function obrasAcompanhadas(){
+  const s=new Set();
+  HIST_COBRANCA.forEach(h=>Object.keys(h.cobrancas||{}).forEach(o=>s.add(o)));
+  return [...s];
+}
+function removerDoHistoricoCobranca(id){
+  const h=HIST_COBRANCA.find(x=>x.id===id); if(!h) return;
+  if(!confirm(`Remover “${h.nome}” do histórico de cobranças? As outras análises importadas continuam.`)) return;
+  HIST_COBRANCA=HIST_COBRANCA.filter(x=>x.id!==id);
+  salvarHistCobranca(); renderHistoricoCobranca();
+}
+function renderHistoricoCobranca(){
+  const elLista=document.getElementById("histCobrancaLista");
+  elLista.innerHTML = HIST_COBRANCA.length ? HIST_COBRANCA.map(h=>`
+    <div class="itemAnalise">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700">${esc(h.nome)}</div>
+        <div class="muted" style="font-size:12px">${esc(h.mes)} · salva em ${new Date(h.quando).toLocaleString("pt-BR")} · ${nnum(Object.keys(h.cobrancas||{}).length)} obra(s) marcada(s) para cobrança</div>
+      </div>
+      <button class="sec perigo" data-remhist="${h.id}">Excluir</button>
+    </div>`).join("")
+    : '<p class="muted" style="margin:0">Nenhuma análise importada ainda — cole um código acima para começar.</p>';
+
+  const obras=obrasAcompanhadas();
+  const tbl=document.getElementById("histTabela"), soPend=document.getElementById("histSoPendentes").checked;
+  if(!obras.length||!HIST_COBRANCA.length){
+    tbl.tHead.innerHTML=""; tbl.tBodies[0].innerHTML="";
+    document.getElementById("histResumo").textContent="";
+    return;
+  }
+  tbl.tHead.innerHTML=`<tr><th>Obra</th><th>Município</th>${HIST_COBRANCA.map(h=>
+    `<th title="${esc(h.nome)}">${esc(h.nome.length>22?h.nome.slice(0,21)+"…":h.nome)}<br><span style="font-weight:400;font-size:10.5px;opacity:.75">${esc(h.mes)}</span></th>`).join("")}<th>Situação atual</th></tr>`;
+  const celula=s=>{
+    if(!s) return {html:'<span class="muted">—</span>',pend:null};
+    if(s.naoenc) return {html:'<span class="tag s-nao">não encontrada</span>',pend:null};
+    if(s.pend>0.005) return {html:`<span class="tag s-pend">${brl(s.pend)}</span>`,pend:s.pend};
+    return {html:'<span class="tag s-ok">✔️ quitada</span>',pend:0};
+  };
+  const linhas=obras.map(obra=>{
+    let mun="", ultima=null;
+    const cels=HIST_COBRANCA.map(h=>{
+      const s=h.situacao[obra]; if(s){mun=s.mun||mun; ultima=s}
+      return celula(s);
+    });
+    const atual = !ultima ? {html:'<span class="muted">obra não apareceu em nenhuma análise importada</span>',pend:null}
+      : ultima.naoenc ? {html:'<span class="tag s-nao">obra não encontrada</span>',pend:null}
+      : ultima.pend>0.005 ? {html:`<span class="tag s-pend">🔴 ainda pendente — ${brl(ultima.pend)}</span>`,pend:ultima.pend}
+      : {html:'<span class="tag s-ok">✅ quitada</span>',pend:0};
+    return {obra,mun,cels,atual};
+  }).filter(l=>!soPend||(l.atual.pend>0.005));
+  linhas.sort((a,b)=>(b.atual.pend||0)-(a.atual.pend||0)||a.obra.localeCompare(b.obra));
+  tbl.tBodies[0].innerHTML = linhas.length
+    ? linhas.map(l=>`<tr><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${l.cels.map(c=>`<td>${c.html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
+    : `<tr><td colspan="${HIST_COBRANCA.length+3}" class="muted" style="padding:16px">Nenhuma obra ${soPend?"ainda pendente":"para mostrar"}.</td></tr>`;
+  const todas=obras.map(o=>{
+    const ultima=[...HIST_COBRANCA].reverse().map(h=>h.situacao[o]).find(Boolean);
+    return ultima&&!ultima.naoenc?ultima.pend:0;
+  });
+  const nPend=todas.filter(p=>p>0.005).length;
+  const total=todas.reduce((a,p)=>a+(p>0?p:0),0);
+  document.getElementById("histResumo").textContent=
+    `${nnum(obras.length)} obra(s) acompanhada(s) · ${nnum(nPend)} ainda pendente(s) · ${brl(total)} em aberto`;
+}
+function abrirCobrancas(){document.getElementById("cobrancaModal").hidden=false; renderHistoricoCobranca()}
+function fecharCobrancas(){document.getElementById("cobrancaModal").hidden=true}
+document.getElementById("btnCobrancas").onclick=abrirCobrancas;
+document.getElementById("cobrancaFechar").onclick=fecharCobrancas;
+document.getElementById("cobrancaModal").addEventListener("click",e=>{if(e.target.id==="cobrancaModal")fecharCobrancas()});
+document.getElementById("histSoPendentes").onchange=renderHistoricoCobranca;
+document.getElementById("histCobrancaLista").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-remhist]"); if(b) removerDoHistoricoCobranca(b.dataset.remhist);
+});
+document.getElementById("btnArquivoCobranca").onclick=()=>document.getElementById("fileCobranca").click();
+document.getElementById("fileCobranca").onchange=e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{document.getElementById("txtCodigoCobranca").value=r.result;
+    document.getElementById("msgCobranca").textContent="Arquivo lido — clique em “Adicionar ao histórico”."};
+  r.readAsText(f); e.target.value="";
+};
+document.getElementById("btnImportarCobranca").onclick=async ()=>{
+  const msg=document.getElementById("msgCobranca"), txt=document.getElementById("txtCodigoCobranca").value;
+  if(!txt.trim()){msg.textContent="Cole o código primeiro.";return}
+  msg.textContent="Importando…";
+  try{
+    const snap=await importarParaHistoricoCobranca(txt);
+    document.getElementById("txtCodigoCobranca").value="";
+    msg.textContent=`✅ “${snap.nome}” (${snap.mes}) adicionada ao histórico.`;
+    renderHistoricoCobranca();
+  }catch(e){ msg.innerHTML='<span style="color:var(--bad)">❌ '+esc(e.message)+"</span>" }
+};
+
 document.getElementById("btnSalvar").onclick=()=>{
   /* com uma análise aberta, deixa escolher entre atualizar ela ou guardar mais uma */
   if(ANALISE_ATUAL){
