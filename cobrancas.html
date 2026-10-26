@@ -97,6 +97,9 @@ tr.obra{cursor:pointer;font-weight:600;border-left:3px solid var(--accent)}
 [data-tema="claro"] .secao.sem>.stitulo,[data-tema="claro"] .secao.sem tfoot th{background:#e0f2fe;color:#0369a1}
 .ftotal{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding:14px 16px;background:linear-gradient(90deg,var(--panel),var(--panel2));border:2px solid var(--accent);border-radius:12px;font-size:16px;font-weight:700}
 .ftotal b{font-size:24px;color:var(--accent)}
+tr.pago-manual{background:var(--ok-bg)}
+tr.pago-manual td{color:var(--muted);text-decoration:line-through}
+tr.pago-manual td:first-child{text-decoration:none}
 td.op-i{color:var(--ok-txt);font-weight:700;white-space:nowrap}
 td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 [data-tema="claro"] td.op-i{color:var(--ok)}
@@ -236,6 +239,33 @@ const HIST_COB="historico-cobrancas";
 let HIST_COBRANCA=[];
 try{const h=localStorage.getItem(HIST_COB); if(h) HIST_COBRANCA=JSON.parse(h)}catch(e){}
 function salvarHistCobranca(){try{localStorage.setItem(HIST_COB,JSON.stringify(HIST_COBRANCA))}catch(e){}}
+/* marcação manual de "já recebi este serviço" — o código é uma fotografia
+   congelada, então isso não existe nele; é um controle só desta página,
+   por cima do que veio no código, pra acompanhar o que já foi resolvido
+   sem precisar gerar um código novo toda hora */
+const PAGOS_KEY="cobrancas-pagos-manual";
+let PAGOS_MANUAL={};
+try{const p=localStorage.getItem(PAGOS_KEY); if(p) PAGOS_MANUAL=JSON.parse(p)}catch(e){}
+function salvarPagosManual(){try{localStorage.setItem(PAGOS_KEY,JSON.stringify(PAGOS_MANUAL))}catch(e){}}
+const chavePago=(snapId,obra,op,cod)=>snapId+"|"+obra+"|"+op+"|"+cod;
+const ehPagoManual=(snapId,obra,op,cod)=>!!PAGOS_MANUAL[chavePago(snapId,obra,op,cod)];
+function alternarPagoManual(snapId,obra,op,cod){
+  const k=chavePago(snapId,obra,op,cod);
+  if(PAGOS_MANUAL[k]) delete PAGOS_MANUAL[k]; else PAGOS_MANUAL[k]={em:new Date().toLocaleString("pt-BR")};
+  salvarPagosManual();
+}
+/* desconta do pendente os serviços que você já marcou como pagos — só nos
+   que ainda pesavam como dívida (pendente/parcial); pago a mais e pago sem
+   apontamento não têm o que "marcar como pago" */
+function pendComPagos(h,obra){
+  const s=h.situacao&&h.situacao[obra];
+  if(!s) return s;
+  const itens=((h.itens||{})[obra]||[]).filter(it=>it.sit==="Pendente de pagamento"||it.sit==="Pagamento parcial");
+  let ajuste=0, divFeito=0;
+  for(const it of itens) if(ehPagoManual(h.id,obra,it.op,it.cod)){ ajuste-=it.vdif; divFeito++ }
+  if(!divFeito) return s;
+  return Object.assign({},s,{pend:Math.round((s.pend+ajuste)*100)/100, div:Math.max(0,s.div-divFeito)});
+}
 const MESES_PT=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const mesDeQuando=iso=>{const d=new Date(iso); return isNaN(d)?"—":MESES_PT[d.getMonth()]+"/"+d.getFullYear()};
 /* mesmo cálculo do confrontoPorObra/valCobranca da análise principal, agora
@@ -369,7 +399,7 @@ function renderHistoricoCobranca(){
   const celula=(h,obra)=>{
     const marcada=h.cobrancas&&h.cobrancas[obra];
     if(!marcada) return {html:'<span class="muted">—</span>',pend:null,marcada:false,tipo:null};
-    const c=classificar(h.situacao[obra]);
+    const c=classificar(pendComPagos(h,obra));
     const html = c.tipo==="ausente" ? '<span class="muted">obra não apareceu nesta análise</span>'
       : c.tipo==="naoenc" ? '<span class="tag s-nao">não encontrada</span>'
       : c.tipo==="quitada" ? '<span class="tag s-ok">✔️ quitada</span>'
@@ -411,19 +441,28 @@ function renderHistoricoCobranca(){
 function abrirDetalheHistObra(obra){
   document.getElementById("histDetalheTitulo").innerHTML=
     `Obra ${esc(obra)} <button class="btnCopiar" onclick="copiarObra(this,'${esc(obra)}')" title="Copiar número da obra">📋</button>`;
-  const linhaItem=t=>`<tr><td>${esc(t.cod)}</td><td class="${t.op==="I"?"op-i":"op-r"}">${t.op==="I"?"▲ Inst.":"▼ Retir."}</td>
+  /* só pendente/parcial têm o que "marcar como pago" — pago a mais e pago
+     sem apontamento já são valor recebido, não uma dívida em aberto */
+  const marcavelSit=new Set(["Pendente de pagamento","Pagamento parcial"]);
+  const linhaItem=(t,snapId,obra)=>{
+    const marcavel=marcavelSit.has(t.sit);
+    const pago=marcavel&&ehPagoManual(snapId,obra,t.op,t.cod);
+    const chk=marcavel?`<td><input type="checkbox" ${pago?"checked":""} data-pagar="${snapId}|${esc(obra)}|${t.op}|${esc(t.cod)}" title="Marcar este serviço como já pago"></td>`:"<td></td>";
+    return `<tr class="${pago?"pago-manual":""}">${chk}<td>${esc(t.cod)}</td><td class="${t.op==="I"?"op-i":"op-r"}">${t.op==="I"?"▲ Inst.":"▼ Retir."}</td>
     <td>${esc(t.serv)}</td><td class="num">${nnum(t.qa)}</td><td class="num">${nnum(t.qp)}</td>
-    <td class="num">${nnum(t.dif)}</td><td class="num">${brl(Math.abs(t.vdif))}</td></tr>`;
-  const bloco=(info,itens)=>{
+    <td class="num">${nnum(t.dif)}</td><td class="num">${brl(Math.abs(t.vdif))}${pago?' <span class="tag s-ok" style="margin-left:4px">pago</span>':""}</td></tr>`;
+  };
+  const bloco=(info,itens,snapId,obra)=>{
     const seus=itens.filter(x=>x.sit===info.sit);
     if(!seus.length) return "";
-    const total=seus.reduce((a,x)=>a+Math.abs(x.vdif),0);
+    const marcavel=marcavelSit.has(info.sit);
+    const total=seus.reduce((a,x)=>a+(marcavel&&ehPagoManual(snapId,obra,x.op,x.cod)?0:Math.abs(x.vdif)),0);
     return `<div class="secao ${info.cls}">
       <div class="stitulo">${info.ico} ${info.titulo} <span class="cont">${seus.length} serviços · ${seus.filter(x=>x.op==="I").length} inst. / ${seus.filter(x=>x.op==="R").length} retir.</span><span class="stot">${brl(total)}</span></div>
-      <table><thead><tr><th>Código</th><th>Op.</th><th>Serviço</th><th class="num">Apontado</th><th class="num">Pago</th>
+      <table><thead><tr>${marcavel?'<th title="Marcar como já pago">💰</th>':"<th></th>"}<th>Código</th><th>Op.</th><th>Serviço</th><th class="num">Apontado</th><th class="num">Pago</th>
         <th class="num">Diferença</th><th class="num">Valor</th></tr></thead>
-        <tbody>${seus.map(linhaItem).join("")}</tbody>
-        <tfoot><tr><th colspan="6">${info.titulo} — total</th><th class="num">${brl(total)}</th></tr></tfoot></table></div>`;
+        <tbody>${seus.map(x=>linhaItem(x,snapId,obra)).join("")}</tbody>
+        <tfoot><tr><th colspan="7">${info.titulo} — total${marcavel?" (sem os já marcados como pagos)":""}</th><th class="num">${brl(total)}</th></tr></tfoot></table></div>`;
   };
   const HIST_SECOES=[
     {sit:"Pendente de pagamento",cls:"pend",ico:"🔴",titulo:"Pendente de pagamento"},
@@ -433,12 +472,13 @@ function abrirDetalheHistObra(obra){
     {sit:"Obra não encontrada no termômetro",cls:"nao",ico:"⚠️",titulo:"Serviços não encontrados no termômetro"}
   ];
   const analise=h=>{
-    const s=h.situacao[obra];
+    const sOriginal=h.situacao[obra];
     const cab=`<div class="fhead" style="margin-top:22px">
       <div class="fnum" style="font-size:16px">${esc(h.nome)}</div>
       <div class="fdesc">${esc(h.mes)} · salva em ${new Date(h.quando).toLocaleString("pt-BR")}</div>
     </div>`;
-    if(!s) return cab+'<p class="muted" style="margin:6px 0 0">Esta obra não apareceu nesta análise.</p>';
+    if(!sOriginal) return cab+'<p class="muted" style="margin:6px 0 0">Esta obra não apareceu nesta análise.</p>';
+    const s=pendComPagos(h,obra);
     const marcada=h.cobrancas&&h.cobrancas[obra];
     const itens=(h.itens||{})[obra]||[];
     const badgeMarcada = marcada ? '<span class="tag s-cob">💰 Marcada para cobrança</span>' : '<span class="tag s-nao">não marcada para cobrança nesta análise</span>';
@@ -449,7 +489,7 @@ function abrirDetalheHistObra(obra){
       : '<span class="tag s-ok">✔️ Conferida</span>';
     const avisoSemDetalhe = !h.itens ? '<p class="muted" style="margin:6px 0 0;font-size:12px">Esta análise foi importada antes de o detalhe por serviço ser guardado — reimporte o código dela para ver os serviços aqui.</p>' : '';
     return cab+`<div style="margin:8px 0 10px;display:flex;gap:6px;flex-wrap:wrap">${badgeMarcada}${badgeAtual}</div>${avisoSemDetalhe}
-      ${HIST_SECOES.map(info=>bloco(info,itens)).join("")}
+      ${HIST_SECOES.map(info=>bloco(info,itens,h.id,obra)).join("")}
       <div class="ftotal"><span>Pendente de pagamento nesta análise</span><b>${brl(s.pend)}</b></div>`;
   };
   document.getElementById("histDetalheCorpo").innerHTML = HIST_COBRANCA.map(analise).join("");
@@ -458,6 +498,13 @@ function abrirDetalheHistObra(obra){
 function fecharDetalheHistObra(){document.getElementById("histDetalheModal").hidden=true}
 document.getElementById("histDetalheFechar").onclick=fecharDetalheHistObra;
 document.getElementById("histDetalheModal").addEventListener("click",e=>{if(e.target.id==="histDetalheModal")fecharDetalheHistObra()});
+document.getElementById("histDetalheCorpo").addEventListener("change",e=>{
+  const chk=e.target.closest("input[data-pagar]"); if(!chk) return;
+  const [snapId,obra,op,cod]=chk.dataset.pagar.split("|");
+  alternarPagoManual(snapId,obra,op,cod);
+  abrirDetalheHistObra(obra);
+  renderHistoricoCobranca();
+});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("histDetalheModal").hidden)fecharDetalheHistObra()});
 document.getElementById("histSoPendentes").onchange=renderHistoricoCobranca;
 document.getElementById("histCobrancaLista").addEventListener("click",e=>{
