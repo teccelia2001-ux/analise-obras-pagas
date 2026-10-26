@@ -58,8 +58,6 @@ input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 button{cursor:pointer;background:var(--btn);border-color:var(--btn);color:#fff;font-weight:600}
 button.sec{background:var(--panel);border-color:var(--line);color:var(--txt);font-weight:500}
 button:hover{filter:brightness(1.08)}
-a.btnlink{display:inline-flex;align-items:center;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--txt);font-weight:500;border-radius:8px;padding:7px 10px;font:inherit;text-decoration:none}
-a.btnlink:hover{filter:brightness(1.08)}
 table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:10px;overflow:hidden}
 th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}
 th{background:var(--head);position:sticky;top:0;cursor:pointer;white-space:nowrap;font-size:12px}
@@ -344,7 +342,6 @@ html{-webkit-text-size-adjust:100%}
     <button class="sec" id="btnSalvar" title="Atualizar a análise aberta ou guardar mais uma">💾 Salvar análise</button>
     <button class="sec" id="btnCodigoAtual" title="Salvar e gerar o código de recuperação desta análise">🔑 Código desta análise</button>
     <button class="sec" id="btnAnalises">📂 Minhas análises</button>
-    <a class="btnlink" href="cobrancas.html" title="Abre em outra página — acompanhar, mês a mês, se as obras marcadas para cobrança já foram pagas">💰 Acompanhar cobranças</a>
     <button class="sec perigo" id="btnLimpar">🗑️ Apagar dados</button>
     <input type="file" id="arq" accept=".xls,.xlsx,.xlsm,.csv" hidden>
   </div>
