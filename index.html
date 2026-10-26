@@ -2239,25 +2239,49 @@ document.getElementById("histDetalheFechar").onclick=fecharDetalheHistObra;
 document.getElementById("histDetalheModal").addEventListener("click",e=>{if(e.target.id==="histDetalheModal")fecharDetalheHistObra()});
 /* ficha de leitura só com o que ficou guardado no histórico — item a item,
    análise por análise, pra ver a mesma pendência indo embora com o tempo */
+/* mesmos nomes/classes/cores das seções da ficha de confronto normal —
+   só que lendo os itens guardados no histórico, sem nada editável */
+const HIST_SECOES=[
+  {sit:"Pendente de pagamento",cls:"pend",ico:"🔴",titulo:"Pendente de pagamento"},
+  {sit:"Pagamento parcial",cls:"parc",ico:"🟠",titulo:"Divergência"},
+  {sit:"Pago a mais",cls:"mais",ico:"🟣",titulo:"Pago a mais"},
+  {sit:"Pago sem apontamento",cls:"sem",ico:"🔵",titulo:"Pago sem apontamento"},
+  {sit:"Obra não encontrada no termômetro",cls:"nao",ico:"⚠️",titulo:"Serviços não encontrados no termômetro"}
+];
 function abrirDetalheHistObra(obra){
-  document.getElementById("histDetalheTitulo").textContent=`Obra ${obra}`;
-  const linha=t=>`<tr><td>${t.cod}</td><td class="${t.op==="I"?"op-i":"op-r"}">${t.op==="I"?"▲ Inst.":"▼ Retir."}</td>
+  document.getElementById("histDetalheTitulo").innerHTML=
+    `Obra ${esc(obra)} <button class="btnCopiar" onclick="copiarObra(this,'${esc(obra)}')" title="Copiar número da obra">📋</button>`;
+  const linhaItem=t=>`<tr><td>${esc(t.cod)}</td><td class="${t.op==="I"?"op-i":"op-r"}">${t.op==="I"?"▲ Inst.":"▼ Retir."}</td>
     <td>${esc(t.serv)}</td><td class="num">${nnum(t.qa)}</td><td class="num">${nnum(t.qp)}</td>
-    <td class="num">${nnum(t.dif)}</td><td class="num">${brl(Math.abs(t.vdif))}</td><td>${tag(t.sit)}</td></tr>`;
-  const secao=h=>{
-    const s=h.situacao[obra];
-    const cab=`<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:18px 0 6px">
-      <strong>${esc(h.nome)}</strong><span class="muted" style="font-size:12px">${esc(h.mes)} · salva em ${new Date(h.quando).toLocaleString("pt-BR")}</span></div>`;
-    if(!s) return cab+'<p class="muted" style="margin:0">Esta obra não apareceu nesta análise.</p>';
-    if(s.naoenc) return cab+'<p class="muted" style="margin:0">⚠️ Obra não encontrada no termômetro nesta análise.</p>';
-    const itens=(h.itens||{})[obra]||[];
-    if(!itens.length) return cab+`<p style="margin:0">${s.pend>0.005?`<span class="tag s-pend">${brl(s.pend)} pendente</span>`:'<span class="tag s-ok">✔️ Conferida — sem pendência</span>'} ${!h.itens?'<span class="muted">(reimporte o código desta análise para ver os serviços — este histórico foi importado antes de guardar o detalhe)</span>':''}</p>`;
-    return cab+`<p style="margin:0 0 6px">${s.pend>0.005?`<span class="tag s-pend">${brl(s.pend)} pendente no total</span>`:'<span class="tag s-ok">✔️ sem pendência — só divergências já compensadas</span>'}</p>
-      <table><thead><tr><th>Código</th><th>Op.</th><th>Serviço</th><th class="num">Apontado</th><th class="num">Pago</th>
-        <th class="num">Diferença</th><th class="num">Valor</th><th>Situação</th></tr></thead>
-        <tbody>${itens.map(linha).join("")}</tbody></table>`;
+    <td class="num">${nnum(t.dif)}</td><td class="num">${brl(Math.abs(t.vdif))}</td></tr>`;
+  const bloco=(info,itens)=>{
+    const seus=itens.filter(x=>x.sit===info.sit);
+    if(!seus.length) return "";
+    const total=seus.reduce((a,x)=>a+Math.abs(x.vdif),0);
+    return `<div class="secao ${info.cls}">
+      <div class="stitulo">${info.ico} ${info.titulo} <span class="cont">${seus.length} serviços · ${seus.filter(x=>x.op==="I").length} inst. / ${seus.filter(x=>x.op==="R").length} retir.</span><span class="stot">${brl(total)}</span></div>
+      <table class="ftbl"><thead><tr><th>Código</th><th>Op.</th><th>Serviço</th><th class="num">Apontado</th><th class="num">Pago</th>
+        <th class="num">Diferença</th><th class="num">Valor</th></tr></thead>
+        <tbody>${seus.map(linhaItem).join("")}</tbody>
+        <tfoot><tr><th colspan="6">${info.titulo} — total</th><th class="num">${brl(total)}</th></tr></tfoot></table></div>`;
   };
-  document.getElementById("histDetalheCorpo").innerHTML = HIST_COBRANCA.map(secao).join("");
+  const analise=h=>{
+    const s=h.situacao[obra];
+    const cab=`<div class="fhead" style="margin-top:22px">
+      <div class="fnum" style="font-size:16px">${esc(h.nome)}</div>
+      <div class="fdesc">${esc(h.mes)} · salva em ${new Date(h.quando).toLocaleString("pt-BR")}</div>
+    </div>`;
+    if(!s) return cab+'<p class="muted" style="margin:6px 0 0">Esta obra não apareceu nesta análise.</p>';
+    const itens=(h.itens||{})[obra]||[];
+    const badgeAtual = s.naoenc ? '<span class="tag s-nao">⚠️ Não encontrada no termômetro</span>'
+      : s.pend>0.005 ? `<span class="tag s-pend">🔴 Pendente de pagamento</span>`
+      : '<span class="tag s-ok">✔️ Conferida</span>';
+    const avisoSemDetalhe = !h.itens ? '<p class="muted" style="margin:6px 0 0;font-size:12px">Esta análise foi importada antes de o detalhe por serviço ser guardado — reimporte o código dela para ver os serviços aqui.</p>' : '';
+    return cab+`<div style="margin:8px 0 10px">${badgeAtual}</div>${avisoSemDetalhe}
+      ${HIST_SECOES.map(info=>bloco(info,itens)).join("")}
+      <div class="ftotal"><span>Pendente de pagamento nesta análise</span><b>${brl(s.pend)}</b></div>`;
+  };
+  document.getElementById("histDetalheCorpo").innerHTML = HIST_COBRANCA.map(analise).join("");
   document.getElementById("histDetalheModal").hidden=false;
 }
 document.getElementById("btnArquivoCobranca").onclick=()=>document.getElementById("fileCobranca").click();
