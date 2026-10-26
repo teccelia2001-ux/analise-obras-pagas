@@ -238,16 +238,60 @@ try{const h=localStorage.getItem(HIST_COB); if(h) HIST_COBRANCA=JSON.parse(h)}ca
 function salvarHistCobranca(){try{localStorage.setItem(HIST_COB,JSON.stringify(HIST_COBRANCA))}catch(e){}}
 const MESES_PT=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const mesDeQuando=iso=>{const d=new Date(iso); return isNaN(d)?"—":MESES_PT[d.getMonth()]+"/"+d.getFullYear()};
-/* mesmo cálculo do confrontoPorObra/valCobranca da análise principal, só que
-   lendo o confronto congelado no código — não usa EDICOES/ADICIONADOS porque
-   isso é trabalho feito depois de salvar, e o código salvo é só a fotografia
-   daquele dia */
-function situacaoPorObraDoCodigo(confronto,inativos){
+/* mesmo cálculo do confrontoPorObra/valCobranca da análise principal, agora
+   aplicando tambem as edições de quantidade (EDICOES) e os serviços
+   acrescentados à mão (ADICIONADOS) salvos no código — sem isso, uma análise
+   com muitas quantidades corrigidas batia errado com o valor "A cobrar" do
+   app principal */
+const situacaoDe=(qa,qp,original)=>{
+  if(original==="Obra não encontrada no termômetro") return original;
+  if(qa>0&&qp===0) return "Pendente de pagamento";
+  if(qa>qp) return "Pagamento parcial";
+  if(qp>qa&&qa>0) return "Pago a mais";
+  if(qa===0&&qp>0) return "Pago sem apontamento";
+  return "Conferido";
+};
+function linhasAdicionadasDe(adicionados){
+  const out=[];
+  for(const obra of Object.keys(adicionados||{}))
+    for(const it of adicionados[obra]){
+      const dif=Math.round((it.qa-it.qp)*100)/100;
+      out.push([obra,it.mun||"",it.op,it.cod,it.serv,it.qa,it.qp,dif,
+        Math.round(dif*(it.unit||0)*100)/100,situacaoDe(it.qa,it.qp,null)]);
+    }
+  return out;
+}
+function situacaoPorObraDoCodigo(confronto,confrontoSS,inativos,edicoes,adicionados){
   const INAT=new Set(inativos||[]);
   const m=new Map(), itens={};
-  for(const r of (confronto&&confronto.linhas)||[]){
-    const [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
+  const linhas=((confronto&&confronto.linhas)||[])
+    .concat((confrontoSS&&confrontoSS.linhas)||[])
+    .concat(linhasAdicionadasDe(adicionados));
+  /* valor unitário do serviço: prioriza a diferença da própria linha (mais
+     fiel, é o preço daquela obra); só recorre a outra obra com o mesmo
+     código quando a linha original não tinha diferença nenhuma pra tirar o
+     valor — sem a planilha original não dá pra olhar a medição como o app
+     principal faz, isso é a aproximação possível */
+  const unitPorCod=new Map();
+  for(const r of linhas){
+    const k=r[2]+"|"+r[3];
+    if(r[7]&&!unitPorCod.has(k)) unitPorCod.set(k, Math.abs(r[8]/r[7]));
+  }
+  for(const r of linhas){
+    let [obra,mun,op,cod,serv,qa,qp,dif,vdif,sit]=r;
     if(INAT.has(obra+"|"+op+"|"+cod)) continue;
+    const ed=(edicoes||{})[obra+"|"+op+"|"+cod];
+    if(ed){
+      let editado=false;
+      if(ed.qa!==undefined&&ed.qa!==qa){qa=ed.qa;editado=true}
+      if(ed.qp!==undefined&&ed.qp!==qp){qp=ed.qp;editado=true}
+      if(editado){
+        dif=Math.round((qa-qp)*100)/100;
+        const u=(r[7]? Math.abs(vdif)/Math.abs(r[7]) : 0) || unitPorCod.get(op+"|"+cod) || 0;
+        vdif=Math.round(dif*u*100)/100;
+        sit=situacaoDe(qa,qp,sit);
+      }
+    }
     if(!m.has(obra)) m.set(obra,{mun,pend:0,maior:0,sem:0,div:0,conf:0,naoenc:false});
     const g=m.get(obra);
     if(sit==="Obra não encontrada no termômetro") g.naoenc=true;
@@ -266,7 +310,7 @@ function situacaoPorObraDoCodigo(confronto,inativos){
 async function importarParaHistoricoCobranca(texto){
   const a=await lerCodigo(texto);
   if(!a.confronto||!a.confronto.linhas) throw new Error("Este código não tem um confronto para acompanhar.");
-  const {situacao,itens}=situacaoPorObraDoCodigo(a.confronto,a.inativos);
+  const {situacao,itens}=situacaoPorObraDoCodigo(a.confronto,a.confrontoSS,a.inativos,a.edicoes,a.adicionados);
   const snap={id:a.id,nome:a.nome,quando:a.quando,mes:mesDeQuando(a.quando),
     cobrancas:a.cobrancas||{},situacao,itens};
   const i=HIST_COBRANCA.findIndex(h=>h.id===snap.id);
