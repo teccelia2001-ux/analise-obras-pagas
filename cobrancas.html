@@ -35,6 +35,7 @@ button.perigo{border-color:var(--bad);color:var(--bad-txt);background:var(--bad-
 button.perigo:hover{background:var(--bad);color:#fff}
 button:hover{filter:brightness(1.08)}
 .painel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
@@ -168,8 +169,20 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
   <div class="cards" id="cards"></div>
 
   <div class="painel">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <label style="font-size:13px"><input type="checkbox" id="histSoPendentes"> Mostrar só as que ainda estão pendentes</label>
+    <div class="filtros">
+      <input id="histBusca" placeholder="Buscar obra (número, município)…" style="min-width:260px;flex:1">
+      <select id="histFiltroMun"><option value="">Todos os municípios</option></select>
+      <select id="histFiltroSit">
+        <option value="">Todas as situações</option>
+        <option value="pendente">🔴 Pendente</option>
+        <option value="divergencia">⚠️ Com divergência</option>
+        <option value="quitada">✔️ Quitada</option>
+        <option value="naoenc">Não encontrada</option>
+      </select>
+      <button class="sec" id="histLimparFiltros">Limpar</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px">
+      <span class="muted" style="font-size:12.5px" id="histContagem"></span>
       <span style="flex:1"></span>
       <span class="muted" style="font-size:12.5px">Clique numa obra para ver o detalhe dos serviços.</span>
     </div>
@@ -387,15 +400,19 @@ function renderHistoricoCobranca(){
     : '<p class="muted" style="margin:0">Nenhuma análise importada ainda — cole um código acima para começar.</p>';
 
   const obras=obrasAcompanhadas();
-  const tbl=document.getElementById("histTabela"), soPend=document.getElementById("histSoPendentes").checked;
+  const tbl=document.getElementById("histTabela");
+  const busca=document.getElementById("histBusca").value.trim().toLowerCase();
+  const fMun=document.getElementById("histFiltroMun").value;
+  const fSit=document.getElementById("histFiltroSit").value;
   if(!obras.length||!HIST_COBRANCA.length){
     tbl.tHead.innerHTML=""; tbl.tBodies[0].innerHTML="";
     document.getElementById("cards").innerHTML="";
+    document.getElementById("histContagem").textContent="";
+    document.getElementById("histFiltroMun").innerHTML='<option value="">Todos os municípios</option>';
     return;
   }
   tbl.tHead.innerHTML=`<tr><th>Obra</th><th>Município</th>${HIST_COBRANCA.map(h=>
     `<th title="${esc(h.nome)}">${esc(h.nome.length>22?h.nome.slice(0,21)+"…":h.nome)}<br><span style="font-weight:400;font-size:10.5px;opacity:.75">${esc(h.mes)}</span></th>`).join("")}<th>Situação atual</th></tr>`;
-  const PRECISA_ATENCAO=new Set(["pendente","divergencia"]);
   const celula=(h,obra)=>{
     const marcada=h.cobrancas&&h.cobrancas[obra];
     if(!marcada) return {html:'<span class="muted">—</span>',pend:null,marcada:false,tipo:null};
@@ -407,7 +424,7 @@ function renderHistoricoCobranca(){
       : `<span class="tag s-parc">⚠️ divergência${c.pend?" · "+brl(c.pend):""}</span>`;
     return {html,pend:c.pend,marcada:true,tipo:c.tipo};
   };
-  const linhas=obras.map(obra=>{
+  const linhasTodas=obras.map(obra=>{
     let mun="", ultima=null;
     const cels=HIST_COBRANCA.map(h=>{
       const c=celula(h,obra);
@@ -420,20 +437,29 @@ function renderHistoricoCobranca(){
       : ultima.tipo==="pendente" ? {html:`<span class="tag s-pend">🔴 ainda pendente — ${brl(ultima.pend)}</span>`,pend:ultima.pend,tipo:"pendente"}
       : {html:`<span class="tag s-parc">⚠️ ainda com divergência${ultima.pend?" · "+brl(ultima.pend):""}</span>`,pend:ultima.pend,tipo:"divergencia"};
     return {obra,mun,cels,atual};
-  }).filter(l=>!soPend||PRECISA_ATENCAO.has(l.atual.tipo));
+  });
+
+  /* monta a lista de municípios sem perder a opção marcada */
+  const municipios=[...new Set(linhasTodas.map(l=>l.mun).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const selMun=document.getElementById("histFiltroMun");
+  selMun.innerHTML=`<option value="">Todos os municípios</option>${municipios.map(m=>`<option value="${esc(m)}"${m===fMun?" selected":""}>${esc(m)}</option>`).join("")}`;
+
+  const linhas=linhasTodas.filter(l=>
+    (!busca||(l.obra+" "+l.mun).toLowerCase().includes(busca)) &&
+    (!fMun||l.mun===fMun) &&
+    (!fSit||l.atual.tipo===fSit));
   linhas.sort((a,b)=>(b.atual.pend||0)-(a.atual.pend||0)||a.obra.localeCompare(b.obra));
   tbl.tBodies[0].innerHTML = linhas.length
     ? linhas.map(l=>`<tr class="obra" data-obra="${esc(l.obra)}" title="Clique para ver o detalhe dos serviços"><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${l.cels.map(c=>`<td>${c.html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
-    : `<tr><td colspan="${HIST_COBRANCA.length+3}" class="muted" style="padding:16px">Nenhuma obra ${soPend?"ainda pendente":"para mostrar"}.</td></tr>`;
-  const todas=obras.map(o=>{
-    const marcadas=[...HIST_COBRANCA].reverse().map(h=>celula(h,o)).filter(c=>c.marcada);
-    return marcadas[0]||{tipo:null,pend:null};
-  });
+    : `<tr><td colspan="${HIST_COBRANCA.length+3}" class="muted" style="padding:16px">Nenhuma obra para mostrar com esse filtro.</td></tr>`;
+  document.getElementById("histContagem").textContent=`Mostrando ${nnum(linhas.length)} de ${nnum(linhasTodas.length)} obra(s) acompanhada(s)`;
+  const PRECISA_ATENCAO=new Set(["pendente","divergencia"]);
+  const todas=linhas.map(l=>l.atual);
   const nPend=todas.filter(c=>PRECISA_ATENCAO.has(c.tipo)).length;
   const total=todas.reduce((a,c)=>a+(c.pend>0?c.pend:0),0);
   document.getElementById("cards").innerHTML=[
     ["Análises importadas",nnum(HIST_COBRANCA.length),""],
-    ["Obras acompanhadas",nnum(obras.length),""],
+    ["Obras no filtro",nnum(linhas.length),""],
     ["Ainda pendentes",nnum(nPend),nPend?"bad":"ok"],
     ["Total em aberto",brl(total),total?"bad":"ok"]
   ].map(([l,v,c])=>`<div class="card ${c}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
@@ -506,7 +532,15 @@ document.getElementById("histDetalheCorpo").addEventListener("change",e=>{
   renderHistoricoCobranca();
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("histDetalheModal").hidden)fecharDetalheHistObra()});
-document.getElementById("histSoPendentes").onchange=renderHistoricoCobranca;
+document.getElementById("histBusca").addEventListener("input",renderHistoricoCobranca);
+document.getElementById("histFiltroMun").addEventListener("change",renderHistoricoCobranca);
+document.getElementById("histFiltroSit").addEventListener("change",renderHistoricoCobranca);
+document.getElementById("histLimparFiltros").onclick=()=>{
+  document.getElementById("histBusca").value="";
+  document.getElementById("histFiltroMun").value="";
+  document.getElementById("histFiltroSit").value="";
+  renderHistoricoCobranca();
+};
 document.getElementById("histCobrancaLista").addEventListener("click",e=>{
   const b=e.target.closest("button[data-remhist]"); if(b) removerDoHistoricoCobranca(b.dataset.remhist);
 });
