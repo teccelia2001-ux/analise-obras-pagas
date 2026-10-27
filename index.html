@@ -100,6 +100,12 @@ button.andamento{background:#0284c7;border-color:#0284c7}
 .tagAnd{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
   background:rgba(56,189,248,.18);color:#38bdf8;border:1px solid #38bdf8;vertical-align:middle}
 [data-tema="claro"] .tagAnd{background:#e0f2fe;color:#0369a1;border-color:#0ea5e9}
+.s-book{background:rgba(249,115,22,.18);color:#f97316;border-color:#f97316}
+[data-tema="claro"] .s-book{background:#ffedd5;color:#c2410c;border-color:#ea580c}
+button.book{background:#ea580c;border-color:#ea580c}
+.tagBook{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
+  background:rgba(249,115,22,.18);color:#f97316;border:1px solid #f97316;vertical-align:middle}
+[data-tema="claro"] .tagBook{background:#ffedd5;color:#c2410c;border-color:#ea580c}
 /* aviso de obra em andamento dentro do relatorio impresso/PNG */
 .rand{margin:6px 0 2px;padding:7px 10px;border-radius:8px;border:1px solid #0ea5e9;
   background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700}
@@ -561,6 +567,7 @@ html{-webkit-text-size-adjust:100%}
       <button id="btnValidar" hidden></button>
       <button id="btnCobrar" hidden></button>
       <button id="btnAndamento" hidden></button>
+      <button id="btnBook" hidden title="Marcar que o book (relatório fotográfico) desta obra está errado ou falta anexar"></button>
       <button class="sec perigo" id="btnRestaurar" hidden title="Desfaz edições de quantidade, serviços desativados, acrescentados à mão e conferidos nesta obra, voltando ao apontado × pago original">↺ Restaurar obra</button>
       <button class="sec" id="relobra" hidden>📄 Relatório desta obra</button>
       <button class="sec" id="csvobra">CSV desta obra</button>
@@ -1070,7 +1077,7 @@ function renderConfronto(){
              : `<span class="tag s-ok">Conferida</span>`;
     const temLV=g.itens.some(x=>ehLV(x.serv));
     const susp=obrasSuspeitas().has(g.obra);
-    return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}${ANDAMENTO[g.obra]?' <span class="tagAnd" title="Obra em andamento — ainda em execução">🚧 em andamento</span>':""}</td>
+    return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}${ANDAMENTO[g.obra]?' <span class="tagAnd" title="Obra em andamento — ainda em execução">🚧 em andamento</span>':""}${BOOK[g.obra]?` <span class="tagBook" title="${esc(BOOK[g.obra].nota||"Book com problema")}">📓 book</span>`:""}</td>
       ${eSS?`<td><b>${esc(ssDaObra(g.obra)||"—")}</b></td>`:""}
       <td class="trunc" title="${esc(desc)}">${esc(desc)||"—"}</td><td>${esc(g.mun)}</td>
       <td>${(EQ()[g.obra]||{}).equipe? esc(EQ()[g.obra].equipe) : '<span class="muted">—</span>'}${susp?' <span class="tagSusp" title="Apontamento idêntico ao de outra obra — confira no termômetro">⚠️ conferir</span>':""}</td>
@@ -1148,7 +1155,7 @@ function desenharFichaConfronto(){
       <div class="fdesc">${esc(m.desc||"")}${g.mun?" · "+esc(g.mun):""}</div>
       ${obrasSuspeitas().has(num)?`<div class="avisoSusp">⚠️ <b>Coleta a conferir:</b> o apontamento desta obra é idêntico ao de outra obra, o que indica que a busca no termômetro devolveu o resultado errado. Confira no termômetro antes de usar estes números — inclusive a equipe.</div>`:""}
       ${(EQ()[num]||{}).equipe?`<div class="fdesc" style="margin-top:2px">👷 Equipe: <b>${esc(EQ()[num].equipe)}</b>${EQ()[num].data?` · última atualização no termômetro em ${esc(EQ()[num].data)}`:""}</div>`:""}
-      <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}${ANDAMENTO[num]?`<span class="tag s-and">🚧 Em andamento</span>`:""}</div>
+      <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}${ANDAMENTO[num]?`<span class="tag s-and">🚧 Em andamento</span>`:""}${BOOK[num]?`<span class="tag s-book" title="${esc(BOOK[num].nota||"")}">📓 Book com problema${BOOK[num].nota?": "+esc(BOOK[num].nota):""}</span>`:""}</div>
     </div></div>
     ${naoenc}
     <div class="secao add">
@@ -1257,8 +1264,9 @@ function abrirFicha(num,tipo){
   document.getElementById("btnValidar").hidden = fichaTipo!=="conf";
   document.getElementById("btnCobrar").hidden = fichaTipo!=="conf";
   document.getElementById("btnAndamento").hidden = fichaTipo!=="conf";
+  document.getElementById("btnBook").hidden = fichaTipo!=="conf";
   document.getElementById("btnRestaurar").hidden = fichaTipo!=="conf";
-  if(fichaTipo==="conf"){ atualizarBotaoValidar(num); atualizarBotaoCobrar(num); atualizarBotaoAndamento(num); }
+  if(fichaTipo==="conf"){ atualizarBotaoValidar(num); atualizarBotaoCobrar(num); atualizarBotaoAndamento(num); atualizarBotaoBook(num); }
   (fichaTipo==="conf"?desenharFichaConfronto:desenharFicha)();
   document.getElementById("modal").hidden=false; document.body.style.overflow="hidden";
 }
@@ -1315,6 +1323,7 @@ document.getElementById("relobra").onclick=()=>abrirRelatorio(fichaObra);
 document.getElementById("btnValidar").onclick=()=>validarObra(fichaObra);
 document.getElementById("btnCobrar").onclick=()=>marcarCobranca(fichaObra);
 document.getElementById("btnAndamento").onclick=()=>marcarAndamento(fichaObra);
+document.getElementById("btnBook").onclick=()=>marcarBook(fichaObra);
 document.getElementById("btnRestaurar").onclick=()=>restaurarObra(fichaObra);
 document.getElementById("csvobra").onclick=()=>{
   if(fichaTipo==="conf"){
@@ -1748,6 +1757,32 @@ function marcarAndamento(obra){
   if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
 }
 
+/* ---------- book (relat\u00f3rio fotogr\u00e1fico) errado ou faltando anexar ----------
+   nao mexe em nenhum valor do confronto \u2014 e so um aviso pra nao esquecer de
+   cobrar o book certo antes de fechar a obra */
+let BOOK={};
+try{const b=localStorage.getItem("confronto-book"); if(b) BOOK=JSON.parse(b)}catch(e){}
+function salvarBook(){try{localStorage.setItem("confronto-book",JSON.stringify(BOOK))}catch(e){}}
+function atualizarBotaoBook(obra){
+  const b=document.getElementById("btnBook"); if(!b) return;
+  const m=BOOK[obra];
+  b.textContent = m ? `\u{1F4D3} Book com problema desde ${m.em} \u2014 resolver` : "\u{1F4D3} Marcar problema no book";
+  b.className = m ? "sec" : "book";
+}
+function marcarBook(obra){
+  if(BOOK[obra]){ delete BOOK[obra]; }
+  else{
+    const nota=prompt("O que est\u00e1 errado no book desta obra? (ex.: book errado, faltando anexar, fotos trocadas... pode deixar em branco)","");
+    if(nota===null) return;
+    BOOK[obra]={em:new Date().toLocaleString("pt-BR"), nota:nota.trim()};
+  }
+  salvarBook();
+  atualizarBotaoBook(obra);
+  if(fichaObra===obra&&fichaTipo==="conf") desenharFichaConfronto();
+  render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
+
 /* ---------- obras marcadas para cobrança ---------- */
 let COBRANCAS={};
 try{const c=localStorage.getItem("confronto-cobrancas"); if(c) COBRANCAS=JSON.parse(c)}catch(e){}
@@ -1784,6 +1819,7 @@ function iniciarAnaliseNova(){
   VALIDADAS={}; salvarValidadas();
   COBRANCAS={}; salvarCobrancas();
   ANDAMENTO={}; salvarAndamento();
+  BOOK={}; salvarBook();
   UNIT=null; invalidarConfronto(); invalidarCatalogo();
 }
 
@@ -1809,7 +1845,7 @@ function gravarAnalise(id,nome,silencioso){
   const base={id,nome,quando:new Date().toISOString(),
     arquivo:(FONTE&&FONTE.nome)||"", aba:(FONTE&&FONTE.aba)||"", datas:(FONTE&&FONTE.datas)||[],
     confronto:CONFRONTO, equipes:EQUIPES, confrontoSS:CONFRONTO_SS, equipesSS:EQUIPES_SS, mapaSS:MAPA_SS, edicoes:EDICOES,
-    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, andamento:ANDAMENTO, resumo:resumoAtual()};
+    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, andamento:ANDAMENTO, book:BOOK, resumo:resumoAtual()};
   const aviso=t=>{const el=document.getElementById("fonte"); if(el&&!silencioso) el.innerHTML=t};
   let completa=true;
   try{ localStorage.setItem("analise:"+id, JSON.stringify(Object.assign({},base,{aoa:(FONTE&&FONTE.aoa)||null}))); }
@@ -1843,6 +1879,7 @@ function abrirAnalise(id){
   VALIDADAS=a.validadas||{}; salvarValidadas();
   COBRANCAS=a.cobrancas||{}; salvarCobrancas();
   ANDAMENTO=a.andamento||{}; salvarAndamento();
+  BOOK=a.book||{}; salvarBook();
   ANALISE_ATUAL={id:a.id,nome:a.nome}; MODO="obra"; invalidarConfronto(); invalidarCatalogo(); salvarRascunho();
   const el=document.getElementById("fonte");
   if(el) el.innerHTML=`📂 <b>${esc(a.nome)}</b> — salva em ${new Date(a.quando).toLocaleString("pt-BR")}`+
