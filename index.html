@@ -375,6 +375,7 @@ html{-webkit-text-size-adjust:100%}
         <label><input type="checkbox" value="sem"> Com pago sem apontamento</label>
         <label><input type="checkbox" value="nao"> Não encontradas no termômetro</label>
         <label><input type="checkbox" value="ok"> Conferidas (sem divergência)</label>
+        <label><input type="checkbox" value="semdivpend" title="Não tem nenhum serviço Pendente de pagamento nem em Pagamento parcial, e foi encontrada no termômetro — mesmo que ainda tenha pago a mais ou pago sem apontamento"> 🟢 Sem pendência nem divergência parcial</label>
         <div class="mselGr">Validação e cobrança</div>
         <label><input type="checkbox" value="pendval"> ⏳ Pendentes de validação</label>
         <label><input type="checkbox" value="val"> ✔️ Já validadas</label>
@@ -978,7 +979,7 @@ function confrontoPorObra(){
     /* cada aba mostra só o seu universo: a 🔢 as obras com SS, a ⚖️ as demais */
     if(!noEscopoDoModo(obra,MODO)) continue;
     const acrescentado=ehAdicionado(obra,op,cod);
-    if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,conf:0,inat:0,naoenc:false,itens:[]});
+    if(!m.has(obra)) m.set(obra,{obra,mun,apont:0,pago:0,pend:0,maior:0,sem:0,div:0,nPend:0,conf:0,inat:0,naoenc:false,itens:[]});
     const g=m.get(obra);
     const inativo=INATIVOS.has(chaveInat(obra,op,cod));
     const ed=EDICOES[obra+"|"+op+"|"+cod];
@@ -996,7 +997,7 @@ function confrontoPorObra(){
     g.itens.push({op,cod,serv,qa,qp,dif,vdif,sit,inativo,editado,acrescentado});
     if(inativo){g.inat=(g.inat||0)+1; continue}
     if(sit==="Obra não encontrada no termômetro") g.naoenc=true;
-    if(sit==="Pendente de pagamento"||sit==="Pagamento parcial"){g.pend+=vdif;g.div++}
+    if(sit==="Pendente de pagamento"||sit==="Pagamento parcial"){g.pend+=vdif;g.div++;g.nPend++}
     else if(sit==="Pago a mais"){g.maior+=Math.abs(vdif);g.div++}
     else if(sit==="Pago sem apontamento"){g.sem+=Math.abs(vdif);g.div++}
     else if(sit==="Conferido") g.conf++;
@@ -1013,16 +1014,18 @@ const valCobranca=g=>Math.round((g.pend-g.maior-g.sem)*100)/100;
 const totalCobranca=L=>Math.round((L.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>a+g.pend,0)
   -L.reduce((a,g)=>a+g.maior+g.sem,0))*100)/100;
 const ROT_SITCONF={pend:"com pendência de pagamento",maior:"com pago a mais",sem:"com pago sem apontamento",
-  nao:"não encontradas no termômetro",ok:"conferidas (sem divergência)",pendval:"pendentes de validação",
+  nao:"não encontradas no termômetro",ok:"conferidas (sem divergência)",semdivpend:"sem pendência nem divergência parcial",
+  pendval:"pendentes de validação",
   val:"já validadas",cobrar:"marcadas para cobrança","-nao":"sem as não encontradas no termômetro"};
 /* filtro de situações do confronto: dentro do mesmo grupo vale qualquer marcada (ou),
    entre os grupos a obra precisa atender aos dois (e), e "-nao" tira as não encontradas */
-const GRUPO_SITCONF={pend:"a",maior:"a",sem:"a",nao:"a",ok:"a",pendval:"b",val:"b",cobrar:"b"};
+const GRUPO_SITCONF={pend:"a",maior:"a",sem:"a",nao:"a",ok:"a",semdivpend:"a",pendval:"b",val:"b",cobrar:"b"};
 function passaSitConf(g,fs){
   const ks=String(fs||"").split(",").filter(Boolean);
   if(!ks.length) return true;
   if(ks.includes("-nao") && g.naoenc) return false;
   const um=(k)=> k==="pend"? g.pend>0 : k==="maior"? g.maior>0 : k==="sem"? g.sem>0 :
+                 k==="semdivpend"? (g.nPend===0&&!g.naoenc) :
                  k==="nao"? g.naoenc : k==="ok"? (g.div===0&&!g.naoenc) : k==="pendval"? !VALIDADAS[g.obra] :
                  k==="val"? !!VALIDADAS[g.obra] : k==="cobrar"? !!COBRANCAS[g.obra] : true;
   for(const gr of ["a","b"]){
