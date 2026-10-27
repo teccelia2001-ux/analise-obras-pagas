@@ -386,6 +386,7 @@ html{-webkit-text-size-adjust:100%}
         <label><input type="checkbox" value="pendval"> ⏳ Pendentes de validação</label>
         <label><input type="checkbox" value="val"> ✔️ Já validadas</label>
         <label><input type="checkbox" value="cobrar"> 💰 Marcadas para cobrança</label>
+        <label><input type="checkbox" value="book"> 📓 Book com problema</label>
         <div class="mselGr">Excluir da lista</div>
         <label><input type="checkbox" value="-nao"> 🚫 Esconder as não encontradas no termômetro</label>
         <div class="mselPe"><button type="button" class="mini" data-mselclear="1">Limpar seleção</button><span class="muted">no mesmo grupo vale <b>qualquer</b> marcada; entre grupos, vale a soma</span></div>
@@ -1023,10 +1024,10 @@ const totalCobranca=L=>Math.round((L.filter(g=>COBRANCAS[g.obra]).reduce((a,g)=>
 const ROT_SITCONF={pend:"com pendência de pagamento",maior:"com pago a mais",sem:"com pago sem apontamento",
   nao:"não encontradas no termômetro",ok:"conferidas (sem divergência)",semdivpend:"sem pendência nem divergência parcial",
   pendval:"pendentes de validação",
-  val:"já validadas",cobrar:"marcadas para cobrança","-nao":"sem as não encontradas no termômetro"};
+  val:"já validadas",cobrar:"marcadas para cobrança",book:"com problema no book","-nao":"sem as não encontradas no termômetro"};
 /* filtro de situações do confronto: dentro do mesmo grupo vale qualquer marcada (ou),
    entre os grupos a obra precisa atender aos dois (e), e "-nao" tira as não encontradas */
-const GRUPO_SITCONF={pend:"a",maior:"a",sem:"a",nao:"a",ok:"a",semdivpend:"a",pendval:"b",val:"b",cobrar:"b"};
+const GRUPO_SITCONF={pend:"a",maior:"a",sem:"a",nao:"a",ok:"a",semdivpend:"a",pendval:"b",val:"b",cobrar:"b",book:"b"};
 function passaSitConf(g,fs){
   const ks=String(fs||"").split(",").filter(Boolean);
   if(!ks.length) return true;
@@ -1034,7 +1035,7 @@ function passaSitConf(g,fs){
   const um=(k)=> k==="pend"? g.pend>0 : k==="maior"? g.maior>0 : k==="sem"? g.sem>0 :
                  k==="semdivpend"? (g.nPend===0&&!g.naoenc) :
                  k==="nao"? g.naoenc : k==="ok"? (g.div===0&&!g.naoenc) : k==="pendval"? !VALIDADAS[g.obra] :
-                 k==="val"? !!VALIDADAS[g.obra] : k==="cobrar"? !!COBRANCAS[g.obra] : true;
+                 k==="val"? !!VALIDADAS[g.obra] : k==="cobrar"? !!COBRANCAS[g.obra] : k==="book"? !!BOOK[g.obra] : true;
   for(const gr of ["a","b"]){
     const doGrupo=ks.filter(k=>GRUPO_SITCONF[k]===gr);
     if(doGrupo.length && !doGrupo.some(um)) return false;
