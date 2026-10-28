@@ -558,7 +558,9 @@ function abrirDetalheHistObra(obra){
     <td class="num">${nnum(t.dif)}</td><td class="num">${brl(Math.abs(t.vdif))}${pago?' <span class="tag s-ok" style="margin-left:4px">pago</span>':""}</td></tr>`;
   };
   const bloco=(info,itens,snapId,obra)=>{
-    const seus=itens.filter(x=>x.sit===info.sit);
+    /* instalados primeiro, depois retirados; dentro de cada um, pelo código */
+    const seus=itens.filter(x=>x.sit===info.sit)
+      .sort((a,b)=>(a.op==="I"?0:1)-(b.op==="I"?0:1)||String(a.cod).localeCompare(String(b.cod),"pt-BR",{numeric:true}));
     if(!seus.length) return "";
     const marcavel=marcavelSit.has(info.sit);
     const total=seus.reduce((a,x)=>a+(marcavel&&ehPagoManual(snapId,obra,x.op,x.cod)?0:Math.abs(x.vdif)),0);
@@ -566,7 +568,11 @@ function abrirDetalheHistObra(obra){
       <div class="stitulo">${info.ico} ${info.titulo} <span class="cont">${seus.length} serviços · ${seus.filter(x=>x.op==="I").length} inst. / ${seus.filter(x=>x.op==="R").length} retir.</span><span class="stot">${brl(total)}</span></div>
       <table><thead><tr>${marcavel?'<th title="Marcar como já pago">💰</th>':"<th></th>"}<th>Código</th><th>Op.</th><th>Serviço</th><th class="num">Apontado</th><th class="num">Pago</th>
         <th class="num">Diferença</th><th class="num">Valor</th></tr></thead>
-        <tbody>${seus.map(x=>linhaItem(x,snapId,obra)).join("")}</tbody>
+        <tbody>${seus.map((x,i)=>{
+          const tr=linhaItem(x,snapId,obra);
+          /* linha mais grossa separando o bloco de instalados do de retirados */
+          return i&&x.op!==seus[i-1].op ? tr.replace("<tr ",'<tr style="border-top:2px solid var(--line)" ') : tr;
+        }).join("")}</tbody>
         <tfoot><tr><th colspan="7">${info.titulo} — total${marcavel?" (sem os já marcados como pagos)":""}</th><th class="num">${brl(total)}</th></tr></tfoot></table></div>`;
   };
   const HIST_SECOES=[
