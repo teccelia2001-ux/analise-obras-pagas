@@ -173,6 +173,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
   <div class="painel">
     <div class="filtros">
       <input id="histBusca" placeholder="Buscar obra (número, município)…" style="min-width:260px;flex:1">
+      <select id="histFiltroAnalise"><option value="">Todas as análises</option></select>
       <select id="histFiltroMun"><option value="">Todos os municípios</option></select>
       <select id="histFiltroSit">
         <option value="">Todas as situações</option>
@@ -406,6 +407,11 @@ function renderHistoricoCobranca(){
   const busca=document.getElementById("histBusca").value.trim().toLowerCase();
   const fMun=document.getElementById("histFiltroMun").value;
   const fSit=document.getElementById("histFiltroSit").value;
+  /* lista de análises sem perder a opção marcada; se a análise marcada foi excluída, volta para "todas" */
+  const selAna=document.getElementById("histFiltroAnalise");
+  const fAna=HIST_COBRANCA.some(h=>h.id===selAna.value)?selAna.value:"";
+  selAna.innerHTML=`<option value="">Todas as análises</option>${HIST_COBRANCA.map(h=>
+    `<option value="${esc(h.id)}"${h.id===fAna?" selected":""}>${esc(h.nome)} (${esc(h.mes)})</option>`).join("")}`;
   if(!obras.length||!HIST_COBRANCA.length){
     tbl.tHead.innerHTML=""; tbl.tBodies[0].innerHTML="";
     document.getElementById("cards").innerHTML="";
@@ -413,7 +419,11 @@ function renderHistoricoCobranca(){
     document.getElementById("histFiltroMun").innerHTML='<option value="">Todos os municípios</option>';
     return;
   }
-  tbl.tHead.innerHTML=`<tr><th>Obra</th><th>Município</th>${HIST_COBRANCA.map(h=>
+  /* com uma análise escolhida, a tabela mostra só a coluna dela e só as obras
+     marcadas para cobrança nela; a "situação atual" continua vindo da análise
+     mais recente, para ver se a cobrança daquela análise já foi resolvida */
+  const iCols=HIST_COBRANCA.map((h,i)=>i).filter(i=>!fAna||HIST_COBRANCA[i].id===fAna);
+  tbl.tHead.innerHTML=`<tr><th>Obra</th><th>Município</th>${iCols.map(i=>HIST_COBRANCA[i]).map(h=>
     `<th title="${esc(h.nome)}">${esc(h.nome.length>22?h.nome.slice(0,21)+"…":h.nome)}<br><span style="font-weight:400;font-size:10.5px;opacity:.75">${esc(h.mes)}</span></th>`).join("")}<th>Situação atual</th></tr>`;
   const celula=(h,obra)=>{
     const marcada=h.cobrancas&&h.cobrancas[obra];
@@ -449,11 +459,12 @@ function renderHistoricoCobranca(){
   const linhas=linhasTodas.filter(l=>
     (!busca||(l.obra+" "+l.mun).toLowerCase().includes(busca)) &&
     (!fMun||l.mun===fMun) &&
-    (!fSit||l.atual.tipo===fSit));
+    (!fSit||l.atual.tipo===fSit) &&
+    (!fAna||iCols.some(i=>l.cels[i].marcada)));
   linhas.sort((a,b)=>(b.atual.pend||0)-(a.atual.pend||0)||a.obra.localeCompare(b.obra));
   tbl.tBodies[0].innerHTML = linhas.length
-    ? linhas.map(l=>`<tr class="obra" data-obra="${esc(l.obra)}" title="Clique para ver o detalhe dos serviços"><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${l.cels.map(c=>`<td>${c.html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
-    : `<tr><td colspan="${HIST_COBRANCA.length+3}" class="muted" style="padding:16px">Nenhuma obra para mostrar com esse filtro.</td></tr>`;
+    ? linhas.map(l=>`<tr class="obra" data-obra="${esc(l.obra)}" title="Clique para ver o detalhe dos serviços"><td>${esc(l.obra)}</td><td>${esc(l.mun)||"—"}</td>${iCols.map(i=>`<td>${l.cels[i].html}</td>`).join("")}<td>${l.atual.html}</td></tr>`).join("")
+    : `<tr><td colspan="${iCols.length+3}" class="muted" style="padding:16px">Nenhuma obra para mostrar com esse filtro.</td></tr>`;
   document.getElementById("histContagem").textContent=`Mostrando ${nnum(linhas.length)} de ${nnum(linhasTodas.length)} obra(s) acompanhada(s)`;
   const PRECISA_ATENCAO=new Set(["pendente","divergencia"]);
   const todas=linhas.map(l=>l.atual);
@@ -535,10 +546,12 @@ document.getElementById("histDetalheCorpo").addEventListener("change",e=>{
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("histDetalheModal").hidden)fecharDetalheHistObra()});
 document.getElementById("histBusca").addEventListener("input",renderHistoricoCobranca);
+document.getElementById("histFiltroAnalise").addEventListener("change",renderHistoricoCobranca);
 document.getElementById("histFiltroMun").addEventListener("change",renderHistoricoCobranca);
 document.getElementById("histFiltroSit").addEventListener("change",renderHistoricoCobranca);
 document.getElementById("histLimparFiltros").onclick=()=>{
   document.getElementById("histBusca").value="";
+  document.getElementById("histFiltroAnalise").value="";
   document.getElementById("histFiltroMun").value="";
   document.getElementById("histFiltroSit").value="";
   renderHistoricoCobranca();
