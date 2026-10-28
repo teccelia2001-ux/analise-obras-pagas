@@ -348,9 +348,17 @@ function alternarPagoManual(snapId,obra,op,cod){
 function pendComPagos(h,obra){
   const s=h.situacao&&h.situacao[obra];
   if(!s) return s;
-  const itens=((h.itens||{})[obra]||[]).filter(it=>it.sit==="Pendente de pagamento"||it.sit==="Pagamento parcial");
+  const todos=(h.itens||{})[obra]||[];
+  const itens=todos.filter(it=>it.sit==="Pendente de pagamento"||it.sit==="Pagamento parcial");
   let ajuste=0, divFeito=0;
   for(const it of itens) if(ehPagoManual(h.id,obra,it.op,it.cod)){ ajuste-=it.vdif; divFeito++ }
+  /* se o que sobra em aberto é só "Pago a mais" / "Pago sem apontamento",
+     não há nada a cobrar: a obra conta como quitada, não como divergente */
+  const PAGO_SOBRANDO=new Set(["Pago a mais","Pago sem apontamento"]);
+  const resta=todos.filter(it=>!PAGO_SOBRANDO.has(it.sit)&&it.sit!=="Conferido"&&
+    !(itens.includes(it)&&ehPagoManual(h.id,obra,it.op,it.cod)));
+  if(todos.length&&!s.naoenc&&!resta.length&&todos.some(it=>PAGO_SOBRANDO.has(it.sit)))
+    return Object.assign({},s,{pend:0,div:0});
   if(!divFeito) return s;
   /* "+0" tira o -0 que o arredondamento deixa quando tudo foi pago ("-R$ 0,00") */
   return Object.assign({},s,{pend:Math.round((s.pend+ajuste)*100)/100+0, div:Math.max(0,s.div-divFeito)});
