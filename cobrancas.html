@@ -165,7 +165,8 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
     </div>
     <p id="msgCobranca" class="muted" style="font-size:12px;margin:6px 0 0"></p>
 
-    <div id="histCobrancaLista" style="display:flex;flex-direction:column;gap:8px;margin-top:14px"></div>
+    <button class="sec" id="btnMinhasAnalises" style="margin-top:12px" aria-expanded="false">📂 Minhas análises</button>
+    <div id="histCobrancaLista" hidden style="flex-direction:column;gap:8px;margin-top:10px"></div>
   </div>
 
   <div class="cards" id="cards"></div>
@@ -401,6 +402,7 @@ function renderHistoricoCobranca(){
       <button class="sec perigo" data-remhist="${h.id}">Excluir</button>
     </div>`).join("")
     : '<p class="muted" style="margin:0">Nenhuma análise importada ainda — cole um código acima para começar.</p>';
+  atualizarBotaoMinhasAnalises();
 
   const obras=obrasAcompanhadas();
   const tbl=document.getElementById("histTabela");
@@ -555,6 +557,18 @@ document.getElementById("histLimparFiltros").onclick=()=>{
   document.getElementById("histFiltroMun").value="";
   document.getElementById("histFiltroSit").value="";
   renderHistoricoCobranca();
+};
+/* a lista de análises fica guardada atrás do botão "Minhas análises" */
+function atualizarBotaoMinhasAnalises(){
+  const aberta=!document.getElementById("histCobrancaLista").hidden;
+  const b=document.getElementById("btnMinhasAnalises");
+  b.textContent=`${aberta?"📂":"📁"} Minhas análises (${nnum(HIST_COBRANCA.length)}) ${aberta?"▲":"▼"}`;
+  b.setAttribute("aria-expanded",aberta);
+}
+document.getElementById("btnMinhasAnalises").onclick=()=>{
+  const l=document.getElementById("histCobrancaLista");
+  l.hidden=!l.hidden; l.style.display=l.hidden?"":"flex";
+  atualizarBotaoMinhasAnalises();
 };
 document.getElementById("histCobrancaLista").addEventListener("click",e=>{
   const b=e.target.closest("button[data-remhist]"); if(b) removerDoHistoricoCobranca(b.dataset.remhist);
