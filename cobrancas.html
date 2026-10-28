@@ -65,6 +65,13 @@ tr.obra{cursor:pointer;font-weight:600;border-left:3px solid var(--accent)}
 [data-tema="claro"] .s-cob{background:#fef9c3;color:#a16207;border-color:#eab308}
 .btnCopiar{cursor:pointer;border:1px solid var(--line);background:none;border-radius:6px;font-size:13px;padding:0 5px;vertical-align:middle;line-height:1.6}
 .btnCopiar:hover{background:var(--head)}
+#histDetalheTitulo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#histDetalheTitulo button{flex:none;width:auto}
+.obraRotulo{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;opacity:.7}
+.obraNum{font-size:22px;font-weight:800;letter-spacing:.02em;color:var(--accent);font-variant-numeric:tabular-nums;
+  padding:2px 10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);
+  background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.obraNumInput{font-size:20px;font-weight:800;width:15ch;padding:3px 8px}
 .itemAnalise{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 @media (max-width:700px){.itemAnalise{flex-direction:column;align-items:stretch}.itemAnalise button{width:100%}}
 #histDetalheModal[hidden]{display:none}
@@ -544,8 +551,12 @@ function renderHistoricoCobranca(){
   ].map(([l,v,c])=>`<div class="card ${c}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
 }
 function abrirDetalheHistObra(obra){
-  document.getElementById("histDetalheTitulo").innerHTML=
-    `Obra ${esc(obra)} <button class="btnCopiar" onclick="copiarObra(this,'${esc(obra)}')" title="Copiar número da obra">📋</button>`;
+  const titulo=document.getElementById("histDetalheTitulo");
+  titulo.dataset.obra=obra;
+  titulo.innerHTML=
+    `<span class="obraRotulo">Obra</span><span class="obraNum">${esc(obra)}</span>
+     <button class="btnCopiar" onclick="copiarObra(this,'${esc(obra)}')" title="Copiar número da obra">📋</button>
+     <button class="btnCopiar" id="btnEditarObra" title="Corrigir o número da obra">✏️</button>`;
   /* só pendente/parcial têm o que "marcar como pago" — pago a mais e pago
      sem apontamento já são valor recebido, não uma dívida em aberto */
   const marcavelSit=new Set(["Pendente de pagamento","Pagamento parcial"]);
@@ -585,7 +596,7 @@ function abrirDetalheHistObra(obra){
   const analise=h=>{
     const sOriginal=h.situacao[obra];
     const cab=`<div class="fhead" style="margin-top:22px">
-      <div class="fnum" style="font-size:16px">${esc(h.nome)}</div>
+      <div class="fnum" style="font-size:13px">${esc(h.nome)}</div>
       <div class="fdesc">${esc(h.mes)} · salva em ${new Date(h.quando).toLocaleString("pt-BR")}</div>
     </div>`;
     if(!sOriginal) return cab+'<p class="muted" style="margin:6px 0 0">Esta obra não apareceu nesta análise.</p>';
@@ -609,6 +620,42 @@ function abrirDetalheHistObra(obra){
     : '<p class="muted" style="margin:16px 0 0">Esta obra não aparece em nenhuma análise importada.</p>';
   document.getElementById("histDetalheModal").hidden=false;
 }
+/* corrige o número da obra em todas as análises importadas (marcação de
+   cobrança, situação, serviços e o "já pago" manual). Só vale para este
+   histórico: reimportar um código antigo traz o número original de volta. */
+function renomearObra(antiga,nova){
+  if(!nova) throw new Error("Digite o número da obra.");
+  if(nova===antiga) return;
+  const conflito=HIST_COBRANCA.find(h=>h.situacao&&h.situacao[antiga]&&h.situacao[nova]);
+  if(conflito) throw new Error(`A obra ${nova} já existe na análise “${conflito.nome}”.`);
+  const mover=o=>{ if(o&&Object.prototype.hasOwnProperty.call(o,antiga)){ o[nova]=o[antiga]; delete o[antiga] } };
+  for(const h of HIST_COBRANCA){ mover(h.cobrancas); mover(h.situacao); mover(h.itens) }
+  for(const k of Object.keys(PAGOS_MANUAL)){
+    const [snapId,obra,...resto]=k.split("|");
+    if(obra===antiga){ PAGOS_MANUAL[[snapId,nova,...resto].join("|")]=PAGOS_MANUAL[k]; delete PAGOS_MANUAL[k] }
+  }
+  salvarHistCobranca(); salvarPagosManual();
+}
+function editarNumeroObra(){
+  const titulo=document.getElementById("histDetalheTitulo"), antiga=titulo.dataset.obra;
+  titulo.innerHTML=`<span class="obraRotulo">Obra</span>
+    <input class="obraNumInput" id="inpNumObra" value="${esc(antiga)}" spellcheck="false">
+    <button id="btnSalvarObra">Salvar</button><button class="sec" id="btnCancelarObra">Cancelar</button>
+    <span id="erroNumObra" style="color:var(--bad);font-size:12px;font-weight:400"></span>`;
+  const inp=document.getElementById("inpNumObra"); inp.focus(); inp.select();
+  const salvar=()=>{
+    const nova=inp.value.trim();
+    try{ renomearObra(antiga,nova) }catch(e){ document.getElementById("erroNumObra").textContent=e.message; return }
+    abrirDetalheHistObra(nova||antiga); renderHistoricoCobranca();
+  };
+  document.getElementById("btnSalvarObra").onclick=salvar;
+  document.getElementById("btnCancelarObra").onclick=()=>abrirDetalheHistObra(antiga);
+  inp.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();salvar()}
+    else if(e.key==="Escape"){e.preventDefault();e.stopPropagation();abrirDetalheHistObra(antiga)}
+  });
+}
+document.getElementById("histDetalheTitulo").addEventListener("click",e=>{if(e.target.id==="btnEditarObra")editarNumeroObra()});
 function fecharDetalheHistObra(){document.getElementById("histDetalheModal").hidden=true}
 document.getElementById("histDetalheFechar").onclick=fecharDetalheHistObra;
 document.getElementById("histDetalheModal").addEventListener("click",e=>{if(e.target.id==="histDetalheModal")fecharDetalheHistObra()});
