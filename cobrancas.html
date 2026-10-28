@@ -352,7 +352,8 @@ function pendComPagos(h,obra){
   let ajuste=0, divFeito=0;
   for(const it of itens) if(ehPagoManual(h.id,obra,it.op,it.cod)){ ajuste-=it.vdif; divFeito++ }
   if(!divFeito) return s;
-  return Object.assign({},s,{pend:Math.round((s.pend+ajuste)*100)/100, div:Math.max(0,s.div-divFeito)});
+  /* "+0" tira o -0 que o arredondamento deixa quando tudo foi pago ("-R$ 0,00") */
+  return Object.assign({},s,{pend:Math.round((s.pend+ajuste)*100)/100+0, div:Math.max(0,s.div-divFeito)});
 }
 const MESES_PT=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const mesDeQuando=iso=>{const d=new Date(iso); return isNaN(d)?"—":MESES_PT[d.getMonth()]+"/"+d.getFullYear()};
@@ -609,8 +610,13 @@ function abrirDetalheHistObra(obra){
       : c.tipo==="pendente" ? `<span class="tag s-pend">🔴 Pendente de pagamento</span>`
       : c.tipo==="divergencia" ? `<span class="tag s-parc">⚠️ Divergência (saldo compensado)</span>`
       : '<span class="tag s-ok">✔️ Conferida</span>';
+    /* marcar/desmarcar de uma vez todos os serviços que dá para marcar como pagos nesta análise */
+    const marcaveis=itens.filter(x=>marcavelSit.has(x.sit));
+    const todosPagos=marcaveis.length&&marcaveis.every(x=>ehPagoManual(h.id,obra,x.op,x.cod));
+    const btnTudo = marcaveis.length
+      ? `<button class="${todosPagos?"sec":""}" style="margin-left:auto;padding:4px 10px;font-size:12.5px" data-pagartudo="${esc(h.id)}" data-valor="${todosPagos?0:1}">${todosPagos?"↩️ Desmarcar todos os pagos":"💰 Marcar tudo como pago"}</button>` : "";
     const avisoSemDetalhe = !h.itens ? '<p class="muted" style="margin:6px 0 0;font-size:12px">Esta análise foi importada antes de o detalhe por serviço ser guardado — reimporte o código dela para ver os serviços aqui.</p>' : '';
-    return cab+`<div style="margin:8px 0 10px;display:flex;gap:6px;flex-wrap:wrap">${badgeMarcada}${badgeAtual}</div>${avisoSemDetalhe}
+    return cab+`<div style="margin:8px 0 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${badgeMarcada}${badgeAtual}${btnTudo}</div>${avisoSemDetalhe}
       ${HIST_SECOES.map(info=>bloco(info,itens,h.id,obra)).join("")}
       <div class="ftotal"><span>Pendente de pagamento nesta análise</span><b>${brl(s.pend)}</b></div>`;
   };
@@ -663,6 +669,21 @@ document.getElementById("histDetalheCorpo").addEventListener("change",e=>{
   const chk=e.target.closest("input[data-pagar]"); if(!chk) return;
   const [snapId,obra,op,cod]=chk.dataset.pagar.split("|");
   alternarPagoManual(snapId,obra,op,cod);
+  abrirDetalheHistObra(obra);
+  renderHistoricoCobranca();
+});
+document.getElementById("histDetalheCorpo").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-pagartudo]"); if(!b) return;
+  const obra=document.getElementById("histDetalheTitulo").dataset.obra;
+  const h=HIST_COBRANCA.find(x=>x.id===b.dataset.pagartudo); if(!h) return;
+  const marcar=b.dataset.valor==="1";
+  for(const x of (h.itens||{})[obra]||[]){
+    if(x.sit!=="Pendente de pagamento"&&x.sit!=="Pagamento parcial") continue;
+    const k=chavePago(h.id,obra,x.op,x.cod);
+    if(marcar){ if(!PAGOS_MANUAL[k]) PAGOS_MANUAL[k]={em:new Date().toLocaleString("pt-BR")} }
+    else delete PAGOS_MANUAL[k];
+  }
+  salvarPagosManual();
   abrirDetalheHistObra(obra);
   renderHistoricoCobranca();
 });
