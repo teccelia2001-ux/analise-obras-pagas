@@ -511,10 +511,14 @@ function renderHistoricoCobranca(){
     return {html,pend:c.pend,marcada:true,tipo:c.tipo};
   };
   const linhasTodas=obras.map(obra=>{
-    let mun="", ultima=null;
+    let mun="", ultima=null, inicial=null;
     const cels=HIST_COBRANCA.map(h=>{
       const c=celula(h,obra);
-      if(c.marcada){ const s=h.situacao[obra]; if(s) mun=s.mun||mun; ultima=c }
+      if(c.marcada){
+        const s=h.situacao[obra]; if(s) mun=s.mun||mun; ultima=c;
+        /* quanto foi cobrado na primeira análise que marcou a obra (antes de qualquer "já pago") */
+        if(inicial===null&&s&&!s.naoenc&&s.pend>0.005) inicial=s.pend;
+      }
       return c;
     });
     const atual = !ultima ? {html:'<span class="muted">não marcada para cobrança em nenhuma análise importada</span>',tipo:null}
@@ -522,7 +526,12 @@ function renderHistoricoCobranca(){
       : ultima.tipo==="quitada" ? {html:'<span class="tag s-ok">✅ quitada</span>',pend:0,tipo:"quitada"}
       : ultima.tipo==="pendente" ? {html:`<span class="tag s-pend">🔴 ainda pendente — ${brl(ultima.pend)}</span>`,pend:ultima.pend,tipo:"pendente"}
       : {html:`<span class="tag s-parc">⚠️ ainda com divergência${ultima.pend?" · "+brl(ultima.pend):""}</span>`,pend:ultima.pend,tipo:"divergencia"};
-    return {obra,mun,cels,atual};
+    /* já pago = o que foi cobrado no começo menos o que ainda está em aberto
+       (vem tanto dos "já pago" marcados à mão quanto de análises mais novas
+       em que a pendência caiu) */
+    const aberto=atual.pend>0?atual.pend:0;
+    const pago=inicial===null||atual.tipo==="ausente"||atual.tipo==="naoenc"?0:Math.max(0,Math.round((inicial-aberto)*100)/100);
+    return {obra,mun,cels,atual,pago};
   });
 
   /* monta a lista de municípios sem perder a opção marcada */
@@ -544,11 +553,13 @@ function renderHistoricoCobranca(){
   const todas=linhas.map(l=>l.atual);
   const nPend=todas.filter(c=>PRECISA_ATENCAO.has(c.tipo)).length;
   const total=todas.reduce((a,c)=>a+(c.pend>0?c.pend:0),0);
+  const pago=linhas.reduce((a,l)=>a+l.pago,0);
   document.getElementById("cards").innerHTML=[
     ["Análises importadas",nnum(HIST_COBRANCA.length),""],
     ["Obras no filtro",nnum(linhas.length),""],
     ["Ainda pendentes",nnum(nPend),nPend?"bad":"ok"],
-    ["Total em aberto",brl(total),total?"bad":"ok"]
+    ["Total em aberto",brl(total),total?"bad":"ok"],
+    ["Já pago",brl(pago),pago?"ok":""]
   ].map(([l,v,c])=>`<div class="card ${c}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join("");
 }
 function abrirDetalheHistObra(obra){
