@@ -603,7 +603,10 @@ function abrirDetalheHistObra(obra){
       ${HIST_SECOES.map(info=>bloco(info,itens,h.id,obra)).join("")}
       <div class="ftotal"><span>Pendente de pagamento nesta análise</span><b>${brl(s.pend)}</b></div>`;
   };
-  document.getElementById("histDetalheCorpo").innerHTML = HIST_COBRANCA.map(analise).join("");
+  /* só as análises em que a obra aparece — as outras não têm nada a mostrar */
+  const suas=HIST_COBRANCA.filter(h=>h.situacao&&h.situacao[obra]);
+  document.getElementById("histDetalheCorpo").innerHTML = suas.length ? suas.map(analise).join("")
+    : '<p class="muted" style="margin:16px 0 0">Esta obra não aparece em nenhuma análise importada.</p>';
   document.getElementById("histDetalheModal").hidden=false;
 }
 function fecharDetalheHistObra(){document.getElementById("histDetalheModal").hidden=true}
