@@ -563,7 +563,6 @@ function renderHistoricoCobranca(){
   const total=todas.reduce((a,c)=>a+(c.pend>0?c.pend:0),0);
   const pago=linhas.reduce((a,l)=>a+l.pago,0);
   document.getElementById("cards").innerHTML=[
-    ["Análises importadas",nnum(HIST_COBRANCA.length),""],
     ["Obras no filtro",nnum(linhas.length),""],
     ["Ainda pendentes",nnum(nPend),nPend?"bad":"ok"],
     ["Total em aberto",brl(total),total?"bad":"ok"],
