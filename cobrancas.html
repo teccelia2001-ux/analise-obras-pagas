@@ -165,7 +165,13 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
     </div>
     <p id="msgCobranca" class="muted" style="font-size:12px;margin:6px 0 0"></p>
 
-    <button class="sec" id="btnMinhasAnalises" style="margin-top:12px" aria-expanded="false">📂 Minhas análises</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px">
+      <button class="sec" id="btnMinhasAnalises" aria-expanded="false">📂 Minhas análises</button>
+      <span style="flex:1"></span>
+      <button class="sec" id="btnBaixarBackup" title="Salva todo o histórico num arquivo — guarde-o para recuperar se os dados do navegador forem apagados">💾 Baixar backup</button>
+      <button class="sec" id="btnRestaurarBackup" title="Recupera o histórico de um arquivo de backup (.json)">♻️ Restaurar backup</button>
+      <input type="file" id="fileBackupCobranca" accept=".json,application/json" hidden>
+    </div>
     <div id="histCobrancaLista" hidden style="flex-direction:column;gap:8px;margin-top:10px"></div>
   </div>
 
@@ -250,12 +256,36 @@ async function lerCodigo(texto){
 /* ---------- acompanhar cobranças: histórico entre períodos diferentes ----------
    guarda só o necessário por obra (situação calculada e o que foi marcado para
    cobrança), nunca a planilha inteira — assim vários períodos cabem tranquilos.
-   Chave de localStorage própria desta página — nenhum outro sistema lê ou
-   escreve aqui. */
+   Fica no IndexedDB (banco próprio desta página): o localStorage do
+   github.io é dividido com o app principal, que guarda planilhas inteiras e
+   enche os ~5 MB — aí a gravação falhava calada e o histórico sumia ao
+   recarregar. O localStorage segue só como cópia reserva/migração. */
 const HIST_COB="historico-cobrancas";
 let HIST_COBRANCA=[];
 try{const h=localStorage.getItem(HIST_COB); if(h) HIST_COBRANCA=JSON.parse(h)}catch(e){}
-function salvarHistCobranca(){try{localStorage.setItem(HIST_COB,JSON.stringify(HIST_COBRANCA))}catch(e){}}
+const IDB_COB=(()=>{
+  let dbP=null;
+  const abrir=()=>dbP||(dbP=new Promise((ok,erro)=>{
+    const r=indexedDB.open("cobrancas-db",1);
+    r.onupgradeneeded=()=>r.result.createObjectStore("kv");
+    r.onsuccess=()=>ok(r.result); r.onerror=()=>erro(r.error);
+  }));
+  const tx=(modo,fn)=>abrir().then(db=>new Promise((ok,erro)=>{
+    const t=db.transaction("kv",modo), req=fn(t.objectStore("kv"));
+    t.oncomplete=()=>ok(req&&req.result); t.onerror=()=>erro(t.error); t.onabort=()=>erro(t.error);
+  }));
+  return {get:k=>tx("readonly",s=>s.get(k)), set:(k,v)=>tx("readwrite",s=>s.put(v,k))};
+})();
+/* pede ao navegador para não apagar estes dados sozinho quando faltar espaço */
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+function avisoFalhaGravar(e){
+  const m=document.getElementById("msgCobranca");
+  if(m) m.innerHTML='<span style="color:var(--bad)">❌ Não consegui guardar o histórico neste navegador ('+esc(e&&e.message||String(e))+'). Use “Baixar backup” para não perder.</span>';
+}
+function salvarHistCobranca(){
+  IDB_COB.set(HIST_COB,HIST_COBRANCA).catch(avisoFalhaGravar);
+  try{localStorage.setItem(HIST_COB,JSON.stringify(HIST_COBRANCA))}catch(e){}
+}
 /* marcação manual de "já recebi este serviço" — o código é uma fotografia
    congelada, então isso não existe nele; é um controle só desta página,
    por cima do que veio no código, pra acompanhar o que já foi resolvido
@@ -263,7 +293,41 @@ function salvarHistCobranca(){try{localStorage.setItem(HIST_COB,JSON.stringify(H
 const PAGOS_KEY="cobrancas-pagos-manual";
 let PAGOS_MANUAL={};
 try{const p=localStorage.getItem(PAGOS_KEY); if(p) PAGOS_MANUAL=JSON.parse(p)}catch(e){}
-function salvarPagosManual(){try{localStorage.setItem(PAGOS_KEY,JSON.stringify(PAGOS_MANUAL))}catch(e){}}
+function salvarPagosManual(){
+  IDB_COB.set(PAGOS_KEY,PAGOS_MANUAL).catch(avisoFalhaGravar);
+  try{localStorage.setItem(PAGOS_KEY,JSON.stringify(PAGOS_MANUAL))}catch(e){}
+}
+/* ao abrir: o IndexedDB manda; se ele ainda não tem nada (primeira vez depois
+   da mudança), migra o que estava no localStorage */
+async function carregarDadosCobranca(){
+  try{
+    const [h,p]=await Promise.all([IDB_COB.get(HIST_COB),IDB_COB.get(PAGOS_KEY)]);
+    if(Array.isArray(h)) HIST_COBRANCA=h; else if(HIST_COBRANCA.length) salvarHistCobranca();
+    if(p&&typeof p==="object") PAGOS_MANUAL=p; else if(Object.keys(PAGOS_MANUAL).length) salvarPagosManual();
+  }catch(e){ avisoFalhaGravar(e) }
+}
+/* backup em arquivo: é o que sobrevive se os dados do navegador forem limpos */
+function baixarBackupCobranca(){
+  const dados={tipo:"backup-cobrancas",versao:1,gerado:new Date().toISOString(),historico:HIST_COBRANCA,pagos:PAGOS_MANUAL};
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(dados)],{type:"application/json"}));
+  a.download=`backup-cobrancas-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+/* junta o backup com o que já está aqui (mesma análise: fica a do backup) */
+function restaurarBackupCobranca(texto){
+  let d; try{d=JSON.parse(texto)}catch(e){throw new Error("Arquivo de backup inválido.")}
+  if(!d||d.tipo!=="backup-cobrancas"||!Array.isArray(d.historico)) throw new Error("Este arquivo não é um backup das cobranças.");
+  for(const snap of d.historico){
+    const i=HIST_COBRANCA.findIndex(h=>h.id===snap.id);
+    if(i>=0) HIST_COBRANCA[i]=snap; else HIST_COBRANCA.push(snap);
+  }
+  HIST_COBRANCA.sort((x,y)=>new Date(x.quando)-new Date(y.quando));
+  Object.assign(PAGOS_MANUAL,d.pagos||{});
+  salvarHistCobranca(); salvarPagosManual();
+  return d.historico.length;
+}
 const chavePago=(snapId,obra,op,cod)=>snapId+"|"+obra+"|"+op+"|"+cod;
 const ehPagoManual=(snapId,obra,op,cod)=>!!PAGOS_MANUAL[chavePago(snapId,obra,op,cod)];
 function alternarPagoManual(snapId,obra,op,cod){
@@ -565,6 +629,22 @@ function atualizarBotaoMinhasAnalises(){
   b.textContent=`${aberta?"📂":"📁"} Minhas análises (${nnum(HIST_COBRANCA.length)}) ${aberta?"▲":"▼"}`;
   b.setAttribute("aria-expanded",aberta);
 }
+document.getElementById("btnBaixarBackup").onclick=()=>{
+  const msg=document.getElementById("msgCobranca");
+  if(!HIST_COBRANCA.length){msg.textContent="Ainda não há análises no histórico para salvar.";return}
+  baixarBackupCobranca();
+  msg.textContent=`💾 Backup com ${nnum(HIST_COBRANCA.length)} análise(s) baixado — guarde o arquivo em lugar seguro.`;
+};
+document.getElementById("btnRestaurarBackup").onclick=()=>document.getElementById("fileBackupCobranca").click();
+document.getElementById("fileBackupCobranca").onchange=async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f) return;
+  const msg=document.getElementById("msgCobranca");
+  try{
+    const n=restaurarBackupCobranca(await f.text());
+    renderHistoricoCobranca();
+    msg.textContent=`♻️ Backup restaurado: ${nnum(n)} análise(s).`;
+  }catch(err){ msg.innerHTML='<span style="color:var(--bad)">❌ '+esc(err.message)+"</span>" }
+};
 document.getElementById("btnMinhasAnalises").onclick=()=>{
   const l=document.getElementById("histCobrancaLista");
   l.hidden=!l.hidden; l.style.display=l.hidden?"":"flex";
@@ -584,7 +664,11 @@ async function importarArquivosCobranca(files){
   const ok=[], erros=[];
   for(const f of lista){
     try{
-      const snap=await importarParaHistoricoCobranca(await f.text());
+      const texto=await f.text();
+      if(texto.trimStart().startsWith("{")){ // arquivo de backup solto na área
+        ok.push(`backup “${f.name}” (${restaurarBackupCobranca(texto)} análise(s))`); continue;
+      }
+      const snap=await importarParaHistoricoCobranca(texto);
       ok.push(`“${snap.nome}” (${snap.mes})`);
     }catch(e){ erros.push(f.name+": "+e.message) }
   }
@@ -635,6 +719,7 @@ let tSalvo="escuro"; try{tSalvo=localStorage.getItem("tema-cobrancas")||"escuro"
 aplicarTema(tSalvo);
 
 renderHistoricoCobranca();
+carregarDadosCobranca().then(renderHistoricoCobranca);
 </script>
 </body>
 </html>
