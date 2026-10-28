@@ -29,6 +29,7 @@ h1{margin:0;font-size:18px}
 .wrap{padding:16px 20px;max-width:1500px;margin:0 auto}
 input,select,button,textarea{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+#painelCobranca.soltando{outline:2px dashed var(--accent);outline-offset:-4px;background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
 button{cursor:pointer;background:var(--btn);border-color:var(--btn);color:#fff;font-weight:600}
 button.sec{background:var(--panel);border-color:var(--line);color:var(--txt);font-weight:500}
 button.perigo{border-color:var(--bad);color:var(--bad-txt);background:var(--bad-bg);font-weight:600}
@@ -145,7 +146,7 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 </header>
 <div class="wrap">
 
-  <div class="painel">
+  <div class="painel" id="painelCobranca">
     <p class="muted" style="margin-top:0;font-size:12.5px">
       Cole aqui o <b>código de recuperação</b> (🔑, um texto que começa com “AOP1-”) de cada período que você quer
       acompanhar. Esta página junta as obras marcadas para <b>cobrança</b> em cada código colado e mostra, período a
@@ -158,7 +159,8 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
       <div style="display:flex;flex-direction:column;gap:6px">
         <button id="btnImportarCobranca">Adicionar ao histórico</button>
         <button class="sec" id="btnArquivoCobranca">📄 Abrir arquivo .txt</button>
-        <input type="file" id="fileCobranca" accept=".txt,.aop,text/plain" hidden>
+        <span class="muted" style="font-size:11px;text-align:center">ou arraste o .txt para cá</span>
+        <input type="file" id="fileCobranca" accept=".txt,.aop,text/plain" multiple hidden>
       </div>
     </div>
     <p id="msgCobranca" class="muted" style="font-size:12px;margin:6px 0 0"></p>
@@ -547,14 +549,41 @@ document.getElementById("histCobrancaLista").addEventListener("click",e=>{
 document.getElementById("histTabela").addEventListener("click",e=>{
   const tr=e.target.closest("tr.obra"); if(tr) abrirDetalheHistObra(tr.dataset.obra);
 });
+/* arquivo aberto pelo botão ou solto na área: já entra direto no histórico (aceita vários de uma vez) */
+async function importarArquivosCobranca(files){
+  const msg=document.getElementById("msgCobranca"), lista=[...files];
+  if(!lista.length) return;
+  msg.textContent="Importando…";
+  const ok=[], erros=[];
+  for(const f of lista){
+    try{
+      const snap=await importarParaHistoricoCobranca(await f.text());
+      ok.push(`“${snap.nome}” (${snap.mes})`);
+    }catch(e){ erros.push(f.name+": "+e.message) }
+  }
+  if(ok.length) renderHistoricoCobranca();
+  msg.innerHTML=[...(ok.length?["✅ "+esc(ok.join(", "))+(ok.length>1?" adicionadas":" adicionada")+" ao histórico."]:[]),
+    ...erros.map(t=>'<span style="color:var(--bad)">❌ '+esc(t)+"</span>")].join("<br>");
+}
 document.getElementById("btnArquivoCobranca").onclick=()=>document.getElementById("fileCobranca").click();
 document.getElementById("fileCobranca").onchange=e=>{
-  const f=e.target.files&&e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=()=>{document.getElementById("txtCodigoCobranca").value=r.result;
-    document.getElementById("msgCobranca").textContent="Arquivo lido — clique em “Adicionar ao histórico”."};
-  r.readAsText(f); e.target.value="";
+  const fs=[...(e.target.files||[])]; e.target.value="";
+  importarArquivosCobranca(fs);
 };
+(()=>{
+  const zona=document.getElementById("painelCobranca"); let prof=0;
+  const temArquivo=e=>[...(e.dataTransfer?.types||[])].includes("Files");
+  zona.addEventListener("dragenter",e=>{if(!temArquivo(e))return; e.preventDefault(); prof++; zona.classList.add("soltando")});
+  zona.addEventListener("dragover",e=>{if(!temArquivo(e))return; e.preventDefault(); e.dataTransfer.dropEffect="copy"});
+  zona.addEventListener("dragleave",()=>{if(--prof<=0){prof=0; zona.classList.remove("soltando")}});
+  zona.addEventListener("drop",e=>{
+    if(!temArquivo(e))return; e.preventDefault(); prof=0; zona.classList.remove("soltando");
+    importarArquivosCobranca(e.dataTransfer.files);
+  });
+  // arquivo solto fora da área não deve fazer o navegador abrir o .txt e sair da página
+  window.addEventListener("dragover",e=>{if(temArquivo(e))e.preventDefault()});
+  window.addEventListener("drop",e=>{if(temArquivo(e))e.preventDefault()});
+})();
 document.getElementById("btnImportarCobranca").onclick=async ()=>{
   const msg=document.getElementById("msgCobranca"), txt=document.getElementById("txtCodigoCobranca").value;
   if(!txt.trim()){msg.textContent="Cole o código primeiro.";return}
