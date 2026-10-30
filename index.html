@@ -106,6 +106,12 @@ button.book{background:#ea580c;border-color:#ea580c}
 .tagBook{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
   background:rgba(249,115,22,.18);color:#f97316;border:1px solid #f97316;vertical-align:middle}
 [data-tema="claro"] .tagBook{background:#ffedd5;color:#c2410c;border-color:#ea580c}
+.s-jacob{background:rgba(99,102,241,.18);color:#818cf8;border-color:#6366f1}
+[data-tema="claro"] .s-jacob{background:#e0e7ff;color:#4338ca;border-color:#6366f1}
+button.jacob{background:#4f46e5;border-color:#4f46e5}
+.tagJaCob{display:inline-block;padding:0 6px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap;
+  background:rgba(99,102,241,.18);color:#818cf8;border:1px solid #6366f1;vertical-align:middle}
+[data-tema="claro"] .tagJaCob{background:#e0e7ff;color:#4338ca;border-color:#6366f1}
 /* aviso de obra em andamento dentro do relatorio impresso/PNG */
 .rand{margin:6px 0 2px;padding:7px 10px;border-radius:8px;border:1px solid #0ea5e9;
   background:#e0f2fe;color:#0369a1;font-size:12.5px;font-weight:700}
@@ -569,6 +575,7 @@ html{-webkit-text-size-adjust:100%}
       <button id="btnCobrar" hidden></button>
       <button id="btnAndamento" hidden></button>
       <button id="btnBook" hidden title="Marcar que o book (relatório fotográfico) desta obra está errado ou falta anexar"></button>
+      <button id="btnJaCobrada" hidden title="Marcar que a divergência desta obra já foi cobrada antes (em outra medição/análise)"></button>
       <button class="sec perigo" id="btnRestaurar" hidden title="Desfaz edições de quantidade, serviços desativados, acrescentados à mão e conferidos nesta obra, voltando ao apontado × pago original">↺ Restaurar obra</button>
       <button class="sec" id="relobra" hidden>📄 Relatório desta obra</button>
       <button class="sec" id="csvobra">CSV desta obra</button>
@@ -1078,7 +1085,7 @@ function renderConfronto(){
              : `<span class="tag s-ok">Conferida</span>`;
     const temLV=g.itens.some(x=>ehLV(x.serv));
     const susp=obrasSuspeitas().has(g.obra);
-    return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}${ANDAMENTO[g.obra]?' <span class="tagAnd" title="Obra em andamento — ainda em execução">🚧 em andamento</span>':""}${BOOK[g.obra]?` <span class="tagBook" title="${esc(BOOK[g.obra].nota||"Book com problema")}">📓 book</span>`:""}</td>
+    return `<tr class="obra" data-c="${g.obra}"><td>${g.obra}${temLV?' <span class="tagLV">⚡ LV</span>':""}${ANDAMENTO[g.obra]?' <span class="tagAnd" title="Obra em andamento — ainda em execução">🚧 em andamento</span>':""}${BOOK[g.obra]?` <span class="tagBook" title="${esc(BOOK[g.obra].nota||"Book com problema")}">📓 book</span>`:""}${JA_COBRADA[g.obra]?` <span class="tagJaCob" title="Divergência já cobrada antes${JA_COBRADA[g.obra].nota?": "+esc(JA_COBRADA[g.obra].nota):""}">📨 já cobrada</span>`:""}</td>
       ${eSS?`<td><b>${esc(ssDaObra(g.obra)||"—")}</b></td>`:""}
       <td class="trunc" title="${esc(desc)}">${esc(desc)||"—"}</td><td>${esc(g.mun)}</td>
       <td>${(EQ()[g.obra]||{}).equipe? esc(EQ()[g.obra].equipe) : '<span class="muted">—</span>'}${susp?' <span class="tagSusp" title="Apontamento idêntico ao de outra obra — confira no termômetro">⚠️ conferir</span>':""}</td>
@@ -1156,7 +1163,7 @@ function desenharFichaConfronto(){
       <div class="fdesc">${esc(m.desc||"")}${g.mun?" · "+esc(g.mun):""}</div>
       ${obrasSuspeitas().has(num)?`<div class="avisoSusp">⚠️ <b>Coleta a conferir:</b> o apontamento desta obra é idêntico ao de outra obra, o que indica que a busca no termômetro devolveu o resultado errado. Confira no termômetro antes de usar estes números — inclusive a equipe.</div>`:""}
       ${(EQ()[num]||{}).equipe?`<div class="fdesc" style="margin-top:2px">👷 Equipe: <b>${esc(EQ()[num].equipe)}</b>${EQ()[num].data?` · última atualização no termômetro em ${esc(EQ()[num].data)}`:""}</div>`:""}
-      <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}${ANDAMENTO[num]?`<span class="tag s-and">🚧 Em andamento</span>`:""}${BOOK[num]?`<span class="tag s-book" title="${esc(BOOK[num].nota||"")}">📓 Book com problema${BOOK[num].nota?": "+esc(BOOK[num].nota):""}</span>`:""}</div>
+      <div style="margin-top:6px">${badge("novo")} <span class="tag ${g.naoenc?"s-nao":g.pend>0?"s-pend":g.div>0?"s-maior":"s-ok"}">${g.naoenc?"Não encontrada no termômetro":g.pend>0?"Pendente de pagamento":g.div>0?"Divergência sem pendência":"Conferida"}</span> ${VALIDADAS[num]?`<span class="tag s-ok">✔️ Validada em ${esc(VALIDADAS[num].em)}</span>`:`<span class="tag s-parc">⏳ Pendente de validação</span>`}${COBRANCAS[num]?`<span class="tag s-cob">💰 Marcada para cobrança</span>`:""}${ANDAMENTO[num]?`<span class="tag s-and">🚧 Em andamento</span>`:""}${BOOK[num]?`<span class="tag s-book" title="${esc(BOOK[num].nota||"")}">📓 Book com problema${BOOK[num].nota?": "+esc(BOOK[num].nota):""}</span>`:""}${JA_COBRADA[num]?`<span class="tag s-jacob" title="Marcada em ${esc(JA_COBRADA[num].em)}">📨 Divergência já cobrada${JA_COBRADA[num].nota?": "+esc(JA_COBRADA[num].nota):""}</span>`:""}</div>
     </div></div>
     ${naoenc}
     <div class="secao add">
@@ -1266,8 +1273,9 @@ function abrirFicha(num,tipo){
   document.getElementById("btnCobrar").hidden = fichaTipo!=="conf";
   document.getElementById("btnAndamento").hidden = fichaTipo!=="conf";
   document.getElementById("btnBook").hidden = fichaTipo!=="conf";
+  document.getElementById("btnJaCobrada").hidden = fichaTipo!=="conf";
   document.getElementById("btnRestaurar").hidden = fichaTipo!=="conf";
-  if(fichaTipo==="conf"){ atualizarBotaoValidar(num); atualizarBotaoCobrar(num); atualizarBotaoAndamento(num); atualizarBotaoBook(num); }
+  if(fichaTipo==="conf"){ atualizarBotaoValidar(num); atualizarBotaoCobrar(num); atualizarBotaoAndamento(num); atualizarBotaoBook(num); atualizarBotaoJaCobrada(num); }
   (fichaTipo==="conf"?desenharFichaConfronto:desenharFicha)();
   document.getElementById("modal").hidden=false; document.body.style.overflow="hidden";
 }
@@ -1325,6 +1333,7 @@ document.getElementById("btnValidar").onclick=()=>validarObra(fichaObra);
 document.getElementById("btnCobrar").onclick=()=>marcarCobranca(fichaObra);
 document.getElementById("btnAndamento").onclick=()=>marcarAndamento(fichaObra);
 document.getElementById("btnBook").onclick=()=>marcarBook(fichaObra);
+document.getElementById("btnJaCobrada").onclick=()=>marcarJaCobrada(fichaObra);
 document.getElementById("btnRestaurar").onclick=()=>restaurarObra(fichaObra);
 document.getElementById("csvobra").onclick=()=>{
   if(fichaTipo==="conf"){
@@ -1784,6 +1793,32 @@ function marcarBook(obra){
   if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
 }
 
+/* ---------- divergência já cobrada antes ----------
+   marca que essa pendência já foi levada ao cliente em outra medição/análise,
+   pra não cobrar de novo achando que é novidade. Não mexe em nenhum valor. */
+let JA_COBRADA={};
+try{const j=localStorage.getItem("confronto-jacobrada"); if(j) JA_COBRADA=JSON.parse(j)}catch(e){}
+function salvarJaCobrada(){try{localStorage.setItem("confronto-jacobrada",JSON.stringify(JA_COBRADA))}catch(e){}}
+function atualizarBotaoJaCobrada(obra){
+  const b=document.getElementById("btnJaCobrada"); if(!b) return;
+  const m=JA_COBRADA[obra];
+  b.textContent = m ? `\u{1F4E8} Já cobrada (marcado em ${m.em}) \u2014 desfazer` : "\u{1F4E8} Divergência já cobrada antes";
+  b.className = m ? "sec" : "jacob";
+}
+function marcarJaCobrada(obra){
+  if(JA_COBRADA[obra]) delete JA_COBRADA[obra];
+  else{
+    const nota=prompt("Quando/onde essa divergência já foi cobrada? (ex.: medição de agosto, e-mail de 10/09... pode deixar em branco)","");
+    if(nota===null) return;
+    JA_COBRADA[obra]={em:new Date().toLocaleString("pt-BR"), nota:nota.trim()};
+  }
+  salvarJaCobrada();
+  atualizarBotaoJaCobrada(obra);
+  if(fichaObra===obra&&fichaTipo==="conf") desenharFichaConfronto();
+  render();
+  if(ANALISE_ATUAL) gravarAnalise(ANALISE_ATUAL.id,ANALISE_ATUAL.nome,true);
+}
+
 /* ---------- obras marcadas para cobrança ---------- */
 let COBRANCAS={};
 try{const c=localStorage.getItem("confronto-cobrancas"); if(c) COBRANCAS=JSON.parse(c)}catch(e){}
@@ -1821,6 +1856,7 @@ function iniciarAnaliseNova(){
   COBRANCAS={}; salvarCobrancas();
   ANDAMENTO={}; salvarAndamento();
   BOOK={}; salvarBook();
+  JA_COBRADA={}; salvarJaCobrada();
   UNIT=null; invalidarConfronto(); invalidarCatalogo();
 }
 
@@ -1846,7 +1882,7 @@ function gravarAnalise(id,nome,silencioso){
   const base={id,nome,quando:new Date().toISOString(),
     arquivo:(FONTE&&FONTE.nome)||"", aba:(FONTE&&FONTE.aba)||"", datas:(FONTE&&FONTE.datas)||[],
     confronto:CONFRONTO, equipes:EQUIPES, confrontoSS:CONFRONTO_SS, equipesSS:EQUIPES_SS, mapaSS:MAPA_SS, edicoes:EDICOES,
-    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, andamento:ANDAMENTO, book:BOOK, resumo:resumoAtual()};
+    inativos:[...INATIVOS], conferidos:CONFERIDOS, adicionados:ADICIONADOS, validadas:VALIDADAS, cobrancas:COBRANCAS, andamento:ANDAMENTO, book:BOOK, jaCobrada:JA_COBRADA, resumo:resumoAtual()};
   const aviso=t=>{const el=document.getElementById("fonte"); if(el&&!silencioso) el.innerHTML=t};
   let completa=true;
   try{ localStorage.setItem("analise:"+id, JSON.stringify(Object.assign({},base,{aoa:(FONTE&&FONTE.aoa)||null}))); }
@@ -1881,6 +1917,7 @@ function abrirAnalise(id){
   COBRANCAS=a.cobrancas||{}; salvarCobrancas();
   ANDAMENTO=a.andamento||{}; salvarAndamento();
   BOOK=a.book||{}; salvarBook();
+  JA_COBRADA=a.jaCobrada||{}; salvarJaCobrada();
   ANALISE_ATUAL={id:a.id,nome:a.nome}; MODO="obra"; invalidarConfronto(); invalidarCatalogo(); salvarRascunho();
   const el=document.getElementById("fonte");
   if(el) el.innerHTML=`📂 <b>${esc(a.nome)}</b> — salva em ${new Date(a.quando).toLocaleString("pt-BR")}`+
