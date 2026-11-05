@@ -1836,7 +1836,26 @@ const OBS_JACOB_PADRAO=["Cobrada na medição anterior","Cobrada por e-mail","Co
 let OBS_JACOB=null;
 try{const o=localStorage.getItem("obs-jacobrada"); if(o) OBS_JACOB=JSON.parse(o)}catch(e){}
 if(!Array.isArray(OBS_JACOB)) OBS_JACOB=OBS_JACOB_PADRAO.slice();
-function salvarObsJaCob(){try{localStorage.setItem("obs-jacobrada",JSON.stringify(OBS_JACOB))}catch(e){}}
+/* as que a pessoa tirou da lista com o X não voltam sozinhas, mesmo que
+   alguma obra ainda use aquela observação */
+let OBS_JACOB_TIRADAS=[];
+try{const t=localStorage.getItem("obs-jacobrada-tiradas"); if(t) OBS_JACOB_TIRADAS=JSON.parse(t)}catch(e){}
+function salvarObsJaCob(){try{
+  localStorage.setItem("obs-jacobrada",JSON.stringify(OBS_JACOB));
+  localStorage.setItem("obs-jacobrada-tiradas",JSON.stringify(OBS_JACOB_TIRADAS));
+}catch(e){}}
+const mesmaObs=(a,b)=>a.trim().toLowerCase()===b.trim().toLowerCase();
+/* traz pra lista toda observação que já foi usada numa obra marcada nesta
+   análise (inclusive as digitadas antes de existir a lista) */
+function incluirObsJaUsadas(){
+  const usadas=Object.values(JA_COBRADA).map(m=>(m&&m.nota||"").trim()).filter(Boolean).reverse();
+  let mudou=false;
+  for(const n of usadas){
+    if(OBS_JACOB.some(o=>mesmaObs(o,n))||OBS_JACOB_TIRADAS.some(o=>mesmaObs(o,n))) continue;
+    OBS_JACOB.unshift(n); mudou=true;
+  }
+  if(mudou) salvarObsJaCob();
+}
 let JACOB_OBRA=null;
 function desenharOpcoesJaCob(){
   document.getElementById("jaCobOpcoes").innerHTML = OBS_JACOB.length
@@ -1845,6 +1864,7 @@ function desenharOpcoesJaCob(){
 }
 function abrirJaCob(obra){
   JACOB_OBRA=obra;
+  incluirObsJaUsadas();
   document.getElementById("jaCobNova").value="";
   desenharOpcoesJaCob();
   document.getElementById("jaCobModal").hidden=false;
@@ -1867,12 +1887,17 @@ document.getElementById("jaCobOpcoes").addEventListener("click",e=>{
   const u=e.target.closest("[data-obsusar]");
   if(u){ aplicarJaCob(OBS_JACOB[+u.dataset.obsusar]); return }
   const d=e.target.closest("[data-obsdel]");
-  if(d){ OBS_JACOB.splice(+d.dataset.obsdel,1); salvarObsJaCob(); desenharOpcoesJaCob() }
+  if(d){
+    const [tirada]=OBS_JACOB.splice(+d.dataset.obsdel,1);
+    if(tirada&&!OBS_JACOB_TIRADAS.some(o=>mesmaObs(o,tirada))) OBS_JACOB_TIRADAS.push(tirada);
+    salvarObsJaCob(); desenharOpcoesJaCob();
+  }
 });
 function criarObsJaCob(){
   const t=document.getElementById("jaCobNova").value.trim();
   if(!t){ document.getElementById("jaCobNova").focus(); return }
-  OBS_JACOB=[t].concat(OBS_JACOB.filter(x=>x.toLowerCase()!==t.toLowerCase()));
+  OBS_JACOB=[t].concat(OBS_JACOB.filter(x=>!mesmaObs(x,t)));
+  OBS_JACOB_TIRADAS=OBS_JACOB_TIRADAS.filter(x=>!mesmaObs(x,t));
   salvarObsJaCob();
   aplicarJaCob(t);
 }
