@@ -179,6 +179,14 @@ td.op-r{color:var(--bad-txt);font-weight:700;white-space:nowrap}
 #codigomodal[hidden]{display:none}
 #codigomodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:80;overflow:auto}
 #analisesmodal[hidden]{display:none}
+#jaCobModal[hidden]{display:none}
+#jaCobModal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:90;overflow:auto}
+.obsOpcoes{display:flex;flex-direction:column;gap:6px}
+.obsOpcao{display:flex;align-items:center;gap:6px}
+.obsOpcao button.obsUsar{flex:1;text-align:left;background:var(--panel);border-color:var(--line);color:var(--txt);font-weight:500}
+.obsOpcao button.obsUsar:hover{border-color:#6366f1;background:var(--panel2)}
+.obsOpcao button.obsDel{padding:4px 9px;background:none;border-color:var(--line);color:var(--muted);font-weight:500}
+.obsOpcao button.obsDel:hover{border-color:var(--bad);color:var(--bad-txt)}
 #analisesmodal{position:fixed;inset:0;background:rgba(2,6,23,.7);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:70;overflow:auto}
 .itemAnalise{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .itemAnalise.atual{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
@@ -453,6 +461,22 @@ html{-webkit-text-size-adjust:100%}
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="jaCobModal" hidden>
+  <div class="mbox" style="max-width:560px">
+    <div class="mtop"><strong>📨 Divergência já cobrada</strong><span style="flex:1"></span>
+      <button class="sec" id="jaCobFechar">Cancelar ✕</button></div>
+    <div style="padding:16px">
+      <p class="muted" style="margin-top:0;font-size:12.5px">Escolha uma observação ou crie uma nova. As novas ficam guardadas aqui para as próximas obras.</p>
+      <div class="obsOpcoes" id="jaCobOpcoes"></div>
+      <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap">
+        <input id="jaCobNova" placeholder="Nova observação (ex.: e-mail de 10/09)…" style="flex:1;min-width:220px">
+        <button id="jaCobSalvarNova">＋ Criar e usar</button>
+      </div>
+      <div style="margin-top:10px"><button class="sec" id="jaCobSemObs">Marcar sem observação</button></div>
     </div>
   </div>
 </div>
@@ -1806,13 +1830,60 @@ function atualizarBotaoJaCobrada(obra){
   b.textContent = m ? `\u{1F4E8} Já cobrada (marcado em ${m.em}) \u2014 desfazer` : "\u{1F4E8} Divergência já cobrada antes";
   b.className = m ? "sec" : "jacob";
 }
+/* observações prontas pra marcar "já cobrada" — começa com algumas comuns e
+   guarda as que forem criadas, pra não digitar a mesma coisa toda vez */
+const OBS_JACOB_PADRAO=["Cobrada na medição anterior","Cobrada por e-mail","Cobrada no relatório de cobrança","Cobrada pelo WhatsApp","Cobrada em reunião"];
+let OBS_JACOB=null;
+try{const o=localStorage.getItem("obs-jacobrada"); if(o) OBS_JACOB=JSON.parse(o)}catch(e){}
+if(!Array.isArray(OBS_JACOB)) OBS_JACOB=OBS_JACOB_PADRAO.slice();
+function salvarObsJaCob(){try{localStorage.setItem("obs-jacobrada",JSON.stringify(OBS_JACOB))}catch(e){}}
+let JACOB_OBRA=null;
+function desenharOpcoesJaCob(){
+  document.getElementById("jaCobOpcoes").innerHTML = OBS_JACOB.length
+    ? OBS_JACOB.map((o,i)=>`<div class="obsOpcao"><button class="obsUsar" data-obsusar="${i}">${esc(o)}</button><button class="obsDel" data-obsdel="${i}" title="Tirar da lista">✕</button></div>`).join("")
+    : '<p class="muted" style="margin:0;font-size:12.5px">Nenhuma observação salva — crie uma abaixo.</p>';
+}
+function abrirJaCob(obra){
+  JACOB_OBRA=obra;
+  document.getElementById("jaCobNova").value="";
+  desenharOpcoesJaCob();
+  document.getElementById("jaCobModal").hidden=false;
+  document.getElementById("jaCobNova").focus();
+}
+function fecharJaCob(){document.getElementById("jaCobModal").hidden=true; JACOB_OBRA=null}
+function aplicarJaCob(nota){
+  const obra=JACOB_OBRA; if(!obra) return;
+  fecharJaCob();
+  JA_COBRADA[obra]={em:new Date().toLocaleString("pt-BR"), nota:(nota||"").trim()};
+  concluirJaCobrada(obra);
+}
+document.getElementById("jaCobFechar").onclick=fecharJaCob;
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&!document.getElementById("jaCobModal").hidden){ e.stopImmediatePropagation(); fecharJaCob() }
+},true);
+document.getElementById("jaCobModal").addEventListener("click",e=>{if(e.target.id==="jaCobModal")fecharJaCob()});
+document.getElementById("jaCobSemObs").onclick=()=>aplicarJaCob("");
+document.getElementById("jaCobOpcoes").addEventListener("click",e=>{
+  const u=e.target.closest("[data-obsusar]");
+  if(u){ aplicarJaCob(OBS_JACOB[+u.dataset.obsusar]); return }
+  const d=e.target.closest("[data-obsdel]");
+  if(d){ OBS_JACOB.splice(+d.dataset.obsdel,1); salvarObsJaCob(); desenharOpcoesJaCob() }
+});
+function criarObsJaCob(){
+  const t=document.getElementById("jaCobNova").value.trim();
+  if(!t){ document.getElementById("jaCobNova").focus(); return }
+  OBS_JACOB=[t].concat(OBS_JACOB.filter(x=>x.toLowerCase()!==t.toLowerCase()));
+  salvarObsJaCob();
+  aplicarJaCob(t);
+}
+document.getElementById("jaCobSalvarNova").onclick=criarObsJaCob;
+document.getElementById("jaCobNova").addEventListener("keydown",e=>{if(e.key==="Enter")criarObsJaCob()});
 function marcarJaCobrada(obra){
-  if(JA_COBRADA[obra]) delete JA_COBRADA[obra];
-  else{
-    const nota=prompt("Quando/onde essa divergência já foi cobrada? (ex.: medição de agosto, e-mail de 10/09... pode deixar em branco)","");
-    if(nota===null) return;
-    JA_COBRADA[obra]={em:new Date().toLocaleString("pt-BR"), nota:nota.trim()};
-  }
+  if(!JA_COBRADA[obra]){ abrirJaCob(obra); return }
+  delete JA_COBRADA[obra];
+  concluirJaCobrada(obra);
+}
+function concluirJaCobrada(obra){
   salvarJaCobrada();
   atualizarBotaoJaCobrada(obra);
   if(fichaObra===obra&&fichaTipo==="conf") desenharFichaConfronto();
